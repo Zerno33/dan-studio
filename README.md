@@ -7,6 +7,49 @@ Platforma generuje **prompty**, nie obrazy.
 
 ---
 
+## Jak pracujemy (dev vs main)
+
+Dwie gałęzie, żeby vibecoding nie rozwalał oficjalnej apki.
+
+| Gałąź | Po co | Co tam robisz |
+|---|---|---|
+| **`dev`** | plac zabaw + wersja do klikania | Cursor, testy, „czy to w ogóle działa” |
+| **`main`** | oficjalny system | tylko to, co już zaakceptowałeś |
+
+### Codziennie (vibecoding)
+
+1. W Cursorze **zawsze wybierz branch `dev`**, nigdy `main`.
+2. Agent koduje na `dev` (albo na małej gałęzi, która wraca do `dev`).
+3. Testujesz na **preview** Vercel (gałąź `dev`) albo lokalnie `npm run dev`.
+4. Jak coś jest do kitu — zostaje na `dev`. `main` się nie rusza.
+
+### Gdy wersja przejdzie akceptację
+
+1. GitHub → **Pull requests** → **New pull request**
+2. base: **`main`** ← compare: **`dev`**
+3. Tytuł np. `Release: to, co zaakceptowaliśmy`
+4. **Merge** — dopiero to jest oficjalna apka
+
+Nie klikaj „merge” w drugą stronę i nie commituj prosto na `main`.
+
+### Jednorazowo na GitHubie (ochrona `main`)
+
+Repo → **Settings** → **Branches** → **Add branch ruleset** (albo Branch protection):
+
+- Target: `main`
+- **Require a pull request before merging**
+- Ewentualnie **Require status checks**: job `build` z workflow `ci`
+
+Wtedy nawet przez pomyłkę nie wepchniesz zmian prosto na produkcję.
+
+### Cursor (Cloud Agents)
+
+W dropdownie gałęzi lista bywa niekompletna — wpisz `dev` w **Search branches**.  
+W Dashboard → Cloud Agents → Defaults ustaw **Base branch = `dev`**.
+
+---
+
+
 ## Stack
 
 - **Next.js 14** (App Router) — hosting na Vercel
