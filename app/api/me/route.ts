@@ -26,12 +26,28 @@ export async function GET(req: NextRequest) {
     .eq("id", user.id)
     .single();
 
+  let bootstrapFirstAdmin = false;
+  if (!profile?.is_admin && !makeAdmin) {
+    const { count } = await supabaseAdmin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("is_admin", true);
+    bootstrapFirstAdmin = (count ?? 0) === 0;
+  }
+
   const profilePatch: Record<string, unknown> = {};
   if (user.email && profile?.email !== user.email) profilePatch.email = user.email;
-  if (makeAdmin && !profile?.is_admin) profilePatch.is_admin = true;
+  if ((makeAdmin || bootstrapFirstAdmin) && !profile?.is_admin) profilePatch.is_admin = true;
   if (!profile?.consent_at) profilePatch.consent_at = new Date().toISOString();
 
-  if (Object.keys(profilePatch).length) {
+  if (!profile) {
+    await supabaseAdmin.from("profiles").upsert({
+      id: user.id,
+      email: user.email,
+      is_admin: !!(makeAdmin || bootstrapFirstAdmin),
+      consent_at: new Date().toISOString(),
+    });
+  } else if (Object.keys(profilePatch).length) {
     await supabaseAdmin.from("profiles").update(profilePatch).eq("id", user.id);
   }
 
@@ -63,7 +79,8 @@ export async function GET(req: NextRequest) {
     credits = { ...credits, balance: newBalance };
   }
 
-  const isAdmin = makeAdmin || !!profile?.is_admin || !!profilePatch.is_admin;
+  const isAdmin =
+    makeAdmin || bootstrapFirstAdmin || !!profile?.is_admin || !!profilePatch.is_admin;
 
   return NextResponse.json({
     user: {

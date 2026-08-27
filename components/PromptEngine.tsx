@@ -186,7 +186,10 @@ export default function PromptEngine() {
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ color: "#E5152A", margin: 0, fontSize: 22, letterSpacing: 1 }}>PROMPT_ENGINE</h1>
-          <p style={{ margin: "4px 0 0", opacity: 0.7, fontSize: 13 }}>{email}</p>
+          <p style={{ margin: "4px 0 0", opacity: 0.7, fontSize: 13 }}>
+            {email}
+            {isAdmin ? " · admin" : ""}
+          </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ border: "1px solid #333", padding: "6px 10px", borderRadius: 8 }}>
