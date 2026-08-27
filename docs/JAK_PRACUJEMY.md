@@ -4,6 +4,11 @@ Nie musisz rozumieć kodu. Ty klikasz w panelach i decydujesz produkt. Ja piszę
 
 **Nigdy nie wklejaj kluczy API na czat, na Slacku ani do Gita.** Tylko w Vercel → Environment Variables.
 
+Zespół agentów (kolejka tasków + prompty do wklejenia): [AGENT_BACKLOG.md](./AGENT_BACKLOG.md).  
+Code review `dev`: [CODE_REVIEW.md](./CODE_REVIEW.md).
+
+W Cloud Agents **Base branch = `dev`**. Jeden agent = jeden task z backlogu = PR do `dev`. Ty mergujesz na `main` dopiero jak klikniesz i działa.
+
 ---
 
 ## Rytm branchy (vibe-code)

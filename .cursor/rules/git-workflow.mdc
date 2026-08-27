@@ -1,0 +1,20 @@
+---
+description: Gałęzie dev vs main — vibecoding bez rozwalania produkcji
+alwaysApply: true
+---
+
+# Gałęzie
+
+- **`dev`** — jedyna gałąź do codziennej pracy i Cloud Agentów. Tu powstaje wersja do klikania i testów.
+- **`main`** — oficjalna, zaakceptowana apka. Nie commituj, nie pushuj i nie merguj na `main`.
+
+## Jak pracować (zespół agentów)
+
+1. Start z `origin/dev` (nie z `main`).
+2. Własny feature branch. Jeden agent = jeden PR = jeden task z `docs/AGENT_BACKLOG.md`.
+3. Pull request **do `dev`**.
+4. Nie ruszaj plików przypisanych innemu otwartemu taskowi (kolumna „Pliki” w backlogu).
+5. Po akceptacji produktowej Mati otwiera PR **`dev` → `main`**. Tytuł: `Release: …`.
+
+Nie otwieraj feature PR-ów do `main`. Nie mieszaj hotfixu produkcji z niedokończonym vibecodingiem na `dev`.
+Nie commituj prosto na `dev`, jeśli inni agenci pracują równolegle — tylko branch + PR.

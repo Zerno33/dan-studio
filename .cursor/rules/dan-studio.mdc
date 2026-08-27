@@ -1,0 +1,38 @@
+---
+description: DAN STUDIO / BRNS — produkt, IP, kredyty, zakazy
+alwaysApply: true
+---
+
+# DAN STUDIO (BRNS)
+
+SaaS dla polskich twórców AI influencer/modeling. Generuje **prompty do obrazów**, nie obrazy.
+Systemy: **N1 / S1 / R1** (D1 później). Mati = PM / jedyny merge na `main`.
+
+## Nienaruszalne
+
+1. `system_prompt` nigdy nie wychodzi do zwykłego klienta. Czytany tylko `service_role`. Userzy: widok `systems_public` (bez tej kolumny). Admin UI może edytować prompt — nie dawaj admina pierwszemu signupowi.
+2. Kredyty: `reserve_credits` **przed** wywołaniem modelu; `refund_credits` przy błędzie. Nigdy read-modify-write na `credits.balance`. Nowa ścieżka grantów (admin / webhook / starter) też przez RPC, nie SELECT+upsert.
+3. Modele tylko z `ALLOWED_MODEL_SET` (`lib/models.ts`). `modelOverride` z requestu bez walidacji = user pali klucz droższym modelem.
+4. Route'y API: `export const dynamic = "force-dynamic"`.
+5. Logi: tylko `err.message` / status. Nigdy pełny obiekt błędu z fetcha (może mieć `Authorization`).
+6. Jedna baza Supabase na `dev` i `main` — migracje **wyłącznie additive**.
+
+## Zakazy (nie implementuj)
+
+- BYOK (MYS-44) — odłożone
+- Treści explicit — wycofane; sufit: swimsuit/lingerie, non-explicit
+- Claude w produkcji (koszt)
+- Commitowanie sekretów / `.env.local`
+
+## Stack (stan na `dev`)
+
+Next.js **15.5** App Router, React 19, Node **22**, Vercel, Supabase (`BRNS SYSTEM`).
+LLM: direct OpenAI/xAI; LiteLLM tylko jeśli `LITELLM_BASE_URL` + `LITELLM_MASTER_KEY`.
+Płatności MoR/Polar — stub webhooka, nie produkcja.
+
+RPC kredytów w kodzie: `reserve_credits` / `refund_credits` (nie `consume_credits`).
+
+## Tracking
+
+Linear: projekt `brns-agnet-8c0035d243de`, prefiks `MYS-*`.
+Backlog agentów: `docs/AGENT_BACKLOG.md`. Review: `docs/CODE_REVIEW.md`.
