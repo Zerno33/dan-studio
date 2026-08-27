@@ -9,9 +9,13 @@ Platforma generuje **prompty**, nie obrazy.
 
 ## Stack
 
-- **Next.js 14** (App Router) — hosting na Vercel
+- **Next.js 15.5** (App Router, React 19, Node 22) — hosting na Vercel
 - **Supabase** (Postgres + Auth + RLS) — projekt `BRNS SYSTEM`
-- **LiteLLM proxy** na Railway → OpenAI / xAI *(status: do rozstrzygnięcia w MYS-13)*
+- **LLM:** direct OpenAI / xAI; LiteLLM na Railway tylko gdy ustawione `LITELLM_BASE_URL` + `LITELLM_MASTER_KEY`
+
+Pomoc dla usera (publiczna, bez logowania): [`/docs`](app/docs/page.tsx) — jak linear.app/docs, nie tracker.  
+Kolejka roboty agentów: [docs/AGENT_BACKLOG.md](docs/AGENT_BACKLOG.md).  
+UX: [docs/UX_NOTES.md](docs/UX_NOTES.md). Review: [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md).
 
 ---
 
@@ -34,20 +38,23 @@ Trzy nieudane buildy na Vercelu (2026-08-20) wynikały z pomijania tego kroku.
 ```
 app/
   api/
-    generate/route.ts              # główny endpoint generacji (MYS-16/17/18)
-    admin/
-      systems/route.ts             # GET lista, POST nowy system
-      systems/[id]/route.ts        # PATCH edycja + bump wersji
-      users/route.ts               # GET lista userów
-      users/[id]/credits/route.ts  # POST ręczne kredyty
-      users/[id]/ban/route.ts      # POST ban/unban
-      ratings-summary/route.ts     # GET pass rate per system+wersja
-      cost-summary/route.ts        # GET koszt/marża (MYS-39)
+    generate/route.ts              # główny endpoint generacji
+    me/route.ts                    # sesja, admin flag, starter credits
+    health/route.ts                # czy env doszedł (bez sekretów)
+    systems/route.ts               # lista publiczna (BEZ system_prompt)
+    prompts/  folders/  ratings/   # biblioteka usera
+    webhooks/mor/route.ts          # stub doładowań (T02 — utwardzić)
+    admin/                         # systems, users, credits, ban, cost
+  login/  terms/  page.tsx
+components/PromptEngine.tsx        # konsola MVP
 lib/
   supabase-admin.ts                # leniwy singleton service_role
-  auth.ts                          # requireAdmin + walidacja slug
-  pricing.ts                        # mapa cen modeli (DO WERYFIKACJI)
-  rate-limit.ts                     # limity req/min i rozmiaru obrazów
+  auth.ts                          # requireUser / requireAdmin
+  credits.ts  llm.ts  models.ts
+  pricing.ts                       # PLACEHOLDER USD — MYS-34
+  rate-limit.ts
+docs/AGENT_BACKLOG.md              # taski dla kolejnych agentów
+docs/CODE_REVIEW.md
 ```
 
 ---
@@ -105,10 +112,13 @@ bloker przed ustaleniem cennika.
 
 ## Znane braki
 
-- Frontend produkcyjny (MYS-43) — prototyp `prompt_engine_v3.jsx` ma instrukcje
-  systemów w kodzie, **nie może trafić na produkcję w tej formie**
-- MoR / płatności (MYS-23, MYS-24)
-- Decyzja LiteLLM vs bezpośrednie wywołania (MYS-13)
+- Konsola MVP jest na `dev` (`components/PromptEngine.tsx`). Prototyp
+  `prompt_engine_v3.jsx` ma instrukcje systemów w kodzie — **nie wraca na produkcję**.
+  Brakuje polishu (MYS-43), nie samego ekranu.
+- MoR / płatności (MYS-23, MYS-24) — webhook jest stubem; nie włączaj checkoutu
+  zanim T02 z backlogu nie będzie merżone
+- Kalibracja realnego cennika USD (MYS-34) — 20 generacji w adminie
 - BYOK — świadomie odłożone (MYS-44)
 
 Tracking: Linear, projekt `brns-agnet-8c0035d243de`, prefiks `MYS-*`.
+Kolejne PR-y agentów: [docs/AGENT_BACKLOG.md](docs/AGENT_BACKLOG.md).

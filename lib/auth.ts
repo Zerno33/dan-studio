@@ -3,6 +3,18 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export { getSupabaseAdmin };
 
+export function adminEmails(): string[] {
+  return (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAdminEmail(email?: string | null): boolean {
+  const normalized = (email || "").toLowerCase();
+  return !!normalized && adminEmails().includes(normalized);
+}
+
 export async function requireUser(req: NextRequest) {
   const supabaseAdmin = getSupabaseAdmin();
   const authHeader = req.headers.get("authorization");
@@ -15,6 +27,8 @@ export async function requireUser(req: NextRequest) {
 export async function requireAdmin(req: NextRequest) {
   const user = await requireUser(req);
   if (!user) return null;
+
+  if (isAdminEmail(user.email)) return user;
 
   const supabaseAdmin = getSupabaseAdmin();
   const { data: profile } = await supabaseAdmin

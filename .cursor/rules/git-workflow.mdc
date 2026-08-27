@@ -1,0 +1,24 @@
+---
+description: Gałęzie dev vs main — vibecoding bez rozwalania produkcji
+alwaysApply: true
+---
+
+# Gałęzie
+
+- **`dev`** — jedyna gałąź do codziennej pracy i Cloud Agentów. Tu powstaje wersja do klikania i testów.
+- **`main`** — oficjalna, zaakceptowana apka. Nie commituj, nie pushuj i nie merguj na `main`.
+
+## Rytm
+
+1. Popraw kod (dziury) → 2. kolejny item z `docs/AGENT_BACKLOG.md` → 3. Mati klika preview → 4. następny feature.
+5. Dopiero gdy flow usera działa: ktoś obcy klika (beta).
+6. UX/UI widoku usera robimy **między** feature’ami. Pomysły: `docs/UX_NOTES.md`. **Nie planujemy designu w Linear.**
+
+## Jak pracować
+
+1. Start z `origin/dev` (nie z `main`).
+2. Jeden agent = jeden PR = **następny** wolny wiersz z backlogu (nie trzy naraz).
+3. Pull request **do `dev`**.
+4. Po „działa”: Mati kiedyś otwiera PR **`dev` → `main`**. Tytuł: `Release: …`.
+
+Nie otwieraj feature PR-ów do `main`. Nie commituj prosto na `dev` przy równoległej pracy — branch + PR.

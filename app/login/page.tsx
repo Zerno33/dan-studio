@@ -73,6 +73,9 @@ export default function LoginPage() {
     <main style={{ maxWidth: 420, margin: "80px auto", padding: 24 }}>
       <h1 style={{ color: "#E5152A" }}>PROMPT_ENGINE</h1>
       <p>Zaloguj się, żeby korzystać z konsoli.</p>
+      <p style={{ fontSize: 14 }}>
+        <a href="/docs">Jak to działa</a> — krótka pomoc, bez logowania.
+      </p>
       <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" style={field} />
       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="hasło" style={field} />
       <label style={{ display: "flex", gap: 8, margin: "12px 0", fontSize: 13 }}>
