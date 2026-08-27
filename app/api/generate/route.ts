@@ -24,7 +24,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { calculateCostUsd } from "@/lib/pricing";
-import { checkRateLimit, validateImages } from "@/lib/rate-limit";
+import { checkRateLimit, validateImages, type GuardResult } from "@/lib/rate-limit";
 import { ALLOWED_MODEL_SET } from "@/lib/models";
 import { calculateCreditCost, expectedBlockCount } from "@/lib/credits";
 import { chatCompletions } from "@/lib/llm";
@@ -123,6 +123,10 @@ function validateInput(body: GenerateRequest): { ok: true } | { ok: false; error
   return { ok: true };
 }
 
+function guardMessage(result: GuardResult): string | null {
+  return result.ok === false ? result.error : null;
+}
+
 // ---------- główny handler ----------
 export async function POST(req: NextRequest) {
   const supabaseAdmin = getSupabaseAdmin();
@@ -153,20 +157,21 @@ export async function POST(req: NextRequest) {
 
   // 2. walidacja wejścia (obejmuje whitelist modelu — MYS-36)
   const validation = validateInput(body);
-  if (validation.ok === false) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
+  const validationMsg = guardMessage(validation);
+  if (validationMsg) {
+    return NextResponse.json({ error: validationMsg }, { status: 400 });
   }
 
   // MYS-40: rozmiar/typ obrazów PRZED jakąkolwiek kosztowną operacją
-  const imgValidation = validateImages(body.images);
-  if (imgValidation.ok === false) {
-    return NextResponse.json({ error: imgValidation.error }, { status: 413 });
+  const imgMsg = guardMessage(validateImages(body.images));
+  if (imgMsg) {
+    return NextResponse.json({ error: imgMsg }, { status: 413 });
   }
 
   // MYS-40: rate limit per user
-  const rateCheck = await checkRateLimit(supabaseAdmin, userId);
-  if (rateCheck.ok === false) {
-    return NextResponse.json({ error: rateCheck.error }, { status: 429 });
+  const rateMsg = guardMessage(await checkRateLimit(supabaseAdmin, userId));
+  if (rateMsg) {
+    return NextResponse.json({ error: rateMsg }, { status: 429 });
   }
 
   const { data: system, error: sysError } = await supabaseAdmin
