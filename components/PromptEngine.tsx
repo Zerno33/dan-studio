@@ -214,6 +214,19 @@ export default function PromptEngine() {
               {t}
             </button>
           ))}
+          <a
+            href="/docs"
+            style={{
+              background: "transparent",
+              color: "#aaa",
+              border: "1px solid #333",
+              padding: "8px 12px",
+              borderRadius: 8,
+              textDecoration: "none",
+            }}
+          >
+            Pomoc
+          </a>
           <button
             onClick={async () => {
               await getSupabaseBrowser().then((s) => s.auth.signOut());

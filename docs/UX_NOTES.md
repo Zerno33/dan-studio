@@ -4,6 +4,15 @@ Design i smaczki **nie idą do Linear**. Nie ma jeszcze siatki ekranów, a w tra
 
 Admin może zostać brzydki. User ma czuć, że to produkt, nie panel dewelopera.
 
+## Pomoc produktu (`/docs`)
+
+To nie jest Linear i nie jest tracker. To **strona pomocy** jak [linear.app/docs](https://linear.app/docs):
+sidebar + artykuły, bez logowania. Link z loginu („Jak to działa”) i z konsoli („Pomoc”).
+
+Screeny: na razie puste ramki. Mati wrzuca zrzuty (login, konsola, N1/S1/R1, wynik) — agent podmienia ramki na `public/docs/…`.
+
+Nie mieszamy tego z markdownem dla agentów (`AGENT_BACKLOG`, `JAK_PRACUJEMY`).
+
 ## Teraz (to, co user widzi na `dev`)
 
 - Login → checkbox regulaminu → konsola (system, brief, Generuj, bloki).

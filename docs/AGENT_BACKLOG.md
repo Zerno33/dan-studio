@@ -26,6 +26,7 @@ Nie implementować: BYOK (MYS-44), explicit, Claude-in-prod, sekretów w gitcie.
 | w tym PR | T01 | Koniec „pierwszy user = admin” | IP i kredyty nie wyciekają |
 | w tym PR | T02 | Webhook bez darmowych 100 | nawet stub nie sypie kasy |
 | w tym PR | T03 | Rate limit + refund po padzie zapisu | nie palimy klucza API |
+| w tym PR | T-DOCS | Publiczna pomoc `/docs` (jak linear.app/docs) | ktoś obcy wie jak kliknąć bez szkolenia |
 | następny | T07 | Widok usera: loader, ban, koszt przed Generuj | pierwsze smaczki konsoli |
 | potem | T04 | Walidacja generate (mode, limity, za mało bloków) | user nie płaci za powietrze |
 | potem | T06 | Prawdziwa zgoda na regulamin | checkbox znaczy zgodę |
@@ -42,6 +43,17 @@ Nie implementować: BYOK (MYS-44), explicit, Claude-in-prod, sekretów w gitcie.
 ## Role (gdy puszczasz agenta)
 
 Wklejasz prompt **jednego** następnego wiersza z kolejki. Nie trzy naraz — zderzą się na tych samych plikach i trudniej klikać.
+
+---
+
+## T-DOCS — publiczna pomoc `/docs`
+
+**Status:** szkielet w tym PR (sidebar + artykuły, puste ramki na screeny)  
+**Pliki:** `app/docs/**`, linki w `app/login/page.tsx` i `components/PromptEngine.tsx`
+
+To jest dokumentacja produktu dla usera (wzorzec [linear.app/docs](https://linear.app/docs)), **nie** klon Lineara i nie edukacja agentów.
+
+Kolejne iteracje: Mati wrzuca zrzuty ekranu → agent wstawia je do `public/docs/` i podmienia `<Shot>` na `<img>`. Nie rozbudowujemy sidebaru zanim nie ma screenów i kliknięć.
 
 ---
 
