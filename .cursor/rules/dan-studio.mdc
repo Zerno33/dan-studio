@@ -34,5 +34,6 @@ RPC kredytów w kodzie: `reserve_credits` / `refund_credits` (nie `consume_credi
 
 ## Tracking
 
-Linear: projekt `brns-agnet-8c0035d243de`, prefiks `MYS-*`.
-Backlog agentów: `docs/AGENT_BACKLOG.md`. Review: `docs/CODE_REVIEW.md`.
+Kolejka roboty: `docs/AGENT_BACKLOG.md` (nie Linear — UX i nowe widoki i tak wpadną w trakcie).
+UX usera / smaczki: `docs/UX_NOTES.md`. Review: `docs/CODE_REVIEW.md`.
+Linear `MYS-*` tylko gdy Mati sam wrzuci konkret; nie wymyślamy tam designu.

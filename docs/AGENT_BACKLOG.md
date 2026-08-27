@@ -1,53 +1,55 @@
-# Backlog dla Cloud Agentów (imitacja dev teamu)
+# Backlog — kolejka na `dev`
 
-Mati uruchamia agentów. Każdy agent = **jeden task** = **jeden PR do `dev`**.
-Nie commituj na `main`. Nie bierz dwóch tasków naraz. Nie ruszaj plików z kolumny **Pliki**, jeśli inny otwarty PR je trzyma.
+Rytm (ustalony z Matim):
 
-Pełne ustalenia recenzji: [CODE_REVIEW.md](./CODE_REVIEW.md).
-Zasady produktu: `.cursor/rules/dan-studio.mdc`.
+1. **Poprawiamy kod** (dziury z review — T01–T03 w tym PR).
+2. **Budujemy backlog po kolei** — jeden feature, jeden PR do `dev`.
+3. **Testujemy** na preview (Mati klika).
+4. **Następny feature.**
+5. Jak flow usera działa → **dajemy komuś do klikania** (beta). Nie wcześniej.
 
-## Jak odpalić (Mati)
+Między tym: design i UX widoku **usera** (smaczki, potem nowe ekrany).  
+**Tego nie planujemy w Linear** — nie ma jeszcze pomysłów, a widoki i tak przyjdą w trakcie. Zrzut: [UX_NOTES.md](./UX_NOTES.md).
 
-1. Cursor → Cloud Agents → **Base branch = `dev`** (wpisz w search, jeśli nie widać).
-2. Nowy agent. Wklej **Prompt** z taska poniżej (cały blok).
-3. Poczekaj na PR do `dev`. Kliknij preview. Napisz „działa” albo co nie gra.
-4. Równolegle wolno puszczać taski z **różnych** grup plików (tabela na dole).
+Nie commituj na `main`. Jeden otwarty task na agenta.  
+Review: [CODE_REVIEW.md](./CODE_REVIEW.md). Zasady: `.cursor/rules/dan-studio.mdc`.
 
 Nie implementować: BYOK (MYS-44), explicit, Claude-in-prod, sekretów w gitcie.
 
 ---
 
-## Role (kto co robi)
+## Kolejka (po tym PR)
 
-| Rola | Taski | Cel |
-|---|---|---|
-| **Security** | T01, T06 | Admin i zgoda na regulamin nie są dziurawe |
-| **Billing** | T02, T05 | Kredyty się zgadzają; webhook nie sypie free money |
-| **Backend generate** | T03, T04 | Limit requestów + walidacja; user nie płaci za powietrze |
-| **Frontend** | T07, T08 | Konsola bez flasha, PL, loading, ban |
-| **Platform** | T00 (ten PR), T09 | CI, lockfile, README |
-| **QA** | T10 | Testy happy path + dziury z review |
+| Status | ID | Co | Po co, zanim ktoś obcy klika |
+|---|---|---|---|
+| w tym PR | T00 | Szyny, CI, review | agenci wiedzą jak pracować |
+| w tym PR | T01 | Koniec „pierwszy user = admin” | IP i kredyty nie wyciekają |
+| w tym PR | T02 | Webhook bez darmowych 100 | nawet stub nie sypie kasy |
+| w tym PR | T03 | Rate limit + refund po padzie zapisu | nie palimy klucza API |
+| następny | T07 | Widok usera: loader, ban, koszt przed Generuj | pierwsze smaczki konsoli |
+| potem | T04 | Walidacja generate (mode, limity, za mało bloków) | user nie płaci za powietrze |
+| potem | T06 | Prawdziwa zgoda na regulamin | checkbox znaczy zgodę |
+| potem | T05 | Atomowe granty admin/starter | saldo się zgadza |
+| potem | T08 | Polski copy + a11y loginu | beta po polsku |
+| potem | T10 | Testy automatyczne | regresja nie wraca |
+| luzem | T09 | README vs drzewo plików | docs |
+| parked | T11–T15 | Admin UI, Polar checkout, cennik USD, foldery | po betcie / decyzji |
+
+**Beta („daj komuś do klikania”)** — po T07 + Twoim „działa” na preview. T04/T06 warto mieć, nie blokują pierwszego zaufanego klikacza jeśli siedzisz obok.
 
 ---
 
-## Kolejność (sprint beta)
+## Role (gdy puszczasz agenta)
 
-**Fala 1 (zrób najpierw, można 3 agentów naraz):** T01 + T02 + T03  
-**Fala 2 (po merżu fali 1):** T04 + T05 + T06  
-**Fala 3:** T07 + T08 + T09  
-**Fala 4:** T10  
-
-T00 = ten PR (reguły, CI Node 22, review, backlog).
-
-Parked (nie teraz): MoR produkcja (MYS-23/24) dopóki T02 nie jest merżone; kalibracja cennika (MYS-34) to kliknięcia Matiego, nie kod; BYOK.
+Wklejasz prompt **jednego** następnego wiersza z kolejki. Nie trzy naraz — zderzą się na tych samych plikach i trudniej klikać.
 
 ---
 
 ## T01 — Security: zdejmij bootstrap admina
 
+**Status:** zrobione w tym PR  
 **Priorytet:** P0  
-**Pliki:** `app/api/me/route.ts`, ewentualnie `.env.example`, `docs/JAK_PRACUJEMY.md`  
-**Nie ruszaj:** `app/api/generate/route.ts`, webhooka, frontu (poza tekstem błędu jeśli trzeba)
+**Pliki:** `app/api/me/route.ts`, `lib/auth.ts`, `.env.example`, `docs/JAK_PRACUJEMY.md`
 
 ### Prompt
 
@@ -72,9 +74,9 @@ Nie: BYOK, płatności, refaktor całej konsoli, zmiany generate.
 
 ## T02 — Billing: utwardź webhook MoR
 
+**Status:** zrobione w tym PR (fail closed + idempotencja po event id; atomowy RPC grant = T05)  
 **Priorytet:** P0  
-**Pliki:** `app/api/webhooks/mor/route.ts`, ewentualnie nowy `lib/credits-grant.ts`, `.env.example`  
-**Nie ruszaj:** `app/api/me/route.ts`, generate (poza wspólnym helperem grantu jeśli wyciągniesz go do `lib/`)
+**Pliki:** `app/api/webhooks/mor/route.ts`
 
 ### Prompt
 
@@ -100,9 +102,9 @@ Nie implementuj pełnego Polar checkout UI. Nie ruszaj T01 (me/route) poza wyci�
 
 ## T03 — Backend: rate limit + refund po błędzie zapisu
 
+**Status:** zrobione w tym PR  
 **Priorytet:** P0  
-**Pliki:** `app/api/generate/route.ts`, `lib/rate-limit.ts`  
-**Nie ruszaj:** webhook, me/route, PromptEngine (chyba że nowy kod błędu)
+**Pliki:** `app/api/generate/route.ts`, `lib/rate-limit.ts`
 
 ### Prompt
 
@@ -201,7 +203,8 @@ Zrób:
 
 ## T07 — Frontend: auth shell, ban, loading, koszt
 
-**Priorytet:** P1  
+**Status:** następny po merżu tego PR  
+**Priorytet:** P1 — pierwsze smaczki **widoku usera** (patrz UX_NOTES.md)  
 **Pliki:** `components/PromptEngine.tsx`, `app/page.tsx`, nowy `middleware.ts` jeśli robisz redirect  
 **Nie ruszaj:** API poza odczytem `isBanned` które już wraca z `/api/me`
 
@@ -293,17 +296,9 @@ Dodaj Vitest (lub Node test runner) bez ciężkiego e2e:
 
 ---
 
-## Mapa plików (żeby agenci się nie zderzyli)
+## Mapa plików (kolejność, nie równoległe fale)
 
-| Plik | Fala 1 | Fala 2 |
-|---|---|---|
-| `app/api/me/route.ts` | T01 | T05, T06 |
-| `app/api/webhooks/mor/route.ts` | T02 | — |
-| `app/api/generate/route.ts` | T03 | T04 |
-| `lib/rate-limit.ts` | T03 | — |
-| `components/PromptEngine.tsx` | — | T07, potem T08 |
-| `README.md` | T00 (część) | T09 (struktura) |
-| `package.json` / lockfile | T00 | — |
+T07 rusza `components/PromptEngine.tsx`. T04 rusza `generate/route.ts` (już poprawiony w T03). T05/T06 ruszają `me/route.ts` (już poprawiony w T01). Nie otwieraj ich jednocześnie.
 
 ---
 

@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, getSupabaseAdmin } from "@/lib/auth";
+import { requireUser, getSupabaseAdmin, isAdminEmail } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-
-function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 const STARTER = Math.max(0, Number(process.env.STARTER_CREDITS || 50));
 
@@ -17,8 +10,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Brak autoryzacji." }, { status: 401 });
 
   const supabaseAdmin = getSupabaseAdmin();
-  const email = (user.email || "").toLowerCase();
-  const makeAdmin = email && adminEmails().includes(email);
+  const makeAdmin = isAdminEmail(user.email);
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
@@ -26,25 +18,17 @@ export async function GET(req: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  let bootstrapFirstAdmin = false;
-  if (!profile?.is_admin && !makeAdmin) {
-    const { count } = await supabaseAdmin
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("is_admin", true);
-    bootstrapFirstAdmin = (count ?? 0) === 0;
-  }
-
   const profilePatch: Record<string, unknown> = {};
   if (user.email && profile?.email !== user.email) profilePatch.email = user.email;
-  if ((makeAdmin || bootstrapFirstAdmin) && !profile?.is_admin) profilePatch.is_admin = true;
+  // Tylko lista ADMIN_EMAILS awansuje. Istniejącego is_admin nie degradujemy.
+  if (makeAdmin && !profile?.is_admin) profilePatch.is_admin = true;
   if (!profile?.consent_at) profilePatch.consent_at = new Date().toISOString();
 
   if (!profile) {
     await supabaseAdmin.from("profiles").upsert({
       id: user.id,
       email: user.email,
-      is_admin: !!(makeAdmin || bootstrapFirstAdmin),
+      is_admin: makeAdmin,
       consent_at: new Date().toISOString(),
     });
   } else if (Object.keys(profilePatch).length) {
@@ -79,8 +63,7 @@ export async function GET(req: NextRequest) {
     credits = { ...credits, balance: newBalance };
   }
 
-  const isAdmin =
-    makeAdmin || bootstrapFirstAdmin || !!profile?.is_admin || !!profilePatch.is_admin;
+  const isAdmin = makeAdmin || !!profile?.is_admin || !!profilePatch.is_admin;
 
   return NextResponse.json({
     user: {

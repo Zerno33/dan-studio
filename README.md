@@ -13,7 +13,8 @@ Platforma generuje **prompty**, nie obrazy.
 - **Supabase** (Postgres + Auth + RLS) — projekt `BRNS SYSTEM`
 - **LLM:** direct OpenAI / xAI; LiteLLM na Railway tylko gdy ustawione `LITELLM_BASE_URL` + `LITELLM_MASTER_KEY`
 
-Dla Cloud Agentów (dev team): [docs/AGENT_BACKLOG.md](docs/AGENT_BACKLOG.md).  
+Dla Cloud Agentów: [docs/AGENT_BACKLOG.md](docs/AGENT_BACKLOG.md) (kolejka po kolei, nie Linear).  
+UX widoku usera: [docs/UX_NOTES.md](docs/UX_NOTES.md).  
 Ostatni code review: [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md).
 
 ---

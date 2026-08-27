@@ -7,7 +7,11 @@ Nie musisz rozumieć kodu. Ty klikasz w panelach i decydujesz produkt. Ja piszę
 Zespół agentów (kolejka tasków + prompty do wklejenia): [AGENT_BACKLOG.md](./AGENT_BACKLOG.md).  
 Code review `dev`: [CODE_REVIEW.md](./CODE_REVIEW.md).
 
-W Cloud Agents **Base branch = `dev`**. Jeden agent = jeden task z backlogu = PR do `dev`. Ty mergujesz na `main` dopiero jak klikniesz i działa.
+W Cloud Agents **Base branch = `dev`**. Jeden agent = **następny** task z backlogu = PR do `dev`.
+
+Rytm: poprawiamy → budujemy po kolei → Ty klikasz preview → kolejny feature. Jak flow usera działa, dajesz komuś do klikania. Design konsoli usera robimy między tym (notatki w [UX_NOTES.md](./UX_NOTES.md), **nie Linear**).
+
+Ty mergujesz na `main` dopiero jak klikniesz i działa.
 
 ---
 
@@ -97,6 +101,7 @@ W **Redirect URLs** dodaj `https://TWOJA-DOMENA/` (ten z Vercel).
 
 Pierwsze wejście na konsolę przy saldzie 0 dodaje **50 kredytów startowych** (raz).  
 Żeby widzieć **admin**: na Vercel ustaw `ADMIN_EMAILS=twoj@mail.com` i Redeploy.
+Bez tej zmiennej **nikt** nie jest adminem — nie ma automatycznego „pierwszy user = admin”.
 
 1. N1 → PROMPT → wklej krótki tekst → Generuj.
 2. Mix N1/S1/R1 do ~20 strzałów.

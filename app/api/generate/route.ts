@@ -127,6 +127,26 @@ function guardMessage(result: GuardResult): string | null {
   return result.ok === false ? result.error : null;
 }
 
+async function refundCredits(
+  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+  amount: number
+): Promise<boolean> {
+  const { error } = await supabaseAdmin.rpc("refund_credits", {
+    p_user: userId,
+    p_amount: amount,
+  });
+  if (error) {
+    console.error("Refund credits error:", error.message);
+    return false;
+  }
+  return true;
+}
+
+function refundFailedMessage(): string {
+  return "Błąd połączenia z modelem. Saldo mogło nie wrócić — napisz do nas.";
+}
+
 // ---------- główny handler ----------
 export async function POST(req: NextRequest) {
   const supabaseAdmin = getSupabaseAdmin();
@@ -168,10 +188,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: imgMsg }, { status: 413 });
   }
 
-  // MYS-40: rate limit per user
+  // MYS-40: rate limit per user (udane + próby)
   const rateMsg = guardMessage(await checkRateLimit(supabaseAdmin, userId));
   if (rateMsg) {
     return NextResponse.json({ error: rateMsg }, { status: 429 });
+  }
+
+  const { error: attemptErr } = await supabaseAdmin.from("credit_transactions").insert({
+    user_id: userId,
+    delta: 0,
+    reason: "generation_attempt",
+  });
+  if (attemptErr) {
+    console.error("Generation attempt log error:", attemptErr.message);
+    return NextResponse.json({ error: "Nie udało się zapisać próby." }, { status: 500 });
   }
 
   const { data: system, error: sysError } = await supabaseAdmin
@@ -273,14 +303,20 @@ export async function POST(req: NextRequest) {
     usage = llm.usage;
   } catch (e) {
     console.error("Generate error:", e instanceof Error ? e.message : "unknown");
-    await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
-    return NextResponse.json({ error: "Błąd połączenia z modelem." }, { status: 502 });
+    const refunded = await refundCredits(supabaseAdmin, userId, cost);
+    return NextResponse.json(
+      { error: refunded ? "Błąd połączenia z modelem." : refundFailedMessage() },
+      { status: 502 }
+    );
   }
 
   const blocks = parseBlocks(raw);
   if (!blocks.length) {
-    await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
-    return NextResponse.json({ error: "Pusty output. Powtórz." }, { status: 502 });
+    const refunded = await refundCredits(supabaseAdmin, userId, cost);
+    return NextResponse.json(
+      { error: refunded ? "Pusty output. Powtórz." : refundFailedMessage() },
+      { status: 502 }
+    );
   }
 
   // 7a. MYS-39: policz koszt USD i zapisz transakcję z detalami tokenów
@@ -291,40 +327,55 @@ export async function POST(req: NextRequest) {
     cachedTokens,
   });
 
-  await supabaseAdmin.from("credit_transactions").insert({
-    user_id: userId,
-    delta: -cost,
-    reason: "generation",
-    system_id: system.id,
-    blocks_count: blocks.length,
-    prompt_tokens: usage.prompt_tokens ?? null,
-    completion_tokens: usage.completion_tokens ?? null,
-    cached_tokens: cachedTokens || null,
-    model: modelToUse,
-    cost_usd: costUsd,
-  });
+  try {
+    const { error: txErr } = await supabaseAdmin.from("credit_transactions").insert({
+      user_id: userId,
+      delta: -cost,
+      reason: "generation",
+      system_id: system.id,
+      blocks_count: blocks.length,
+      prompt_tokens: usage.prompt_tokens ?? null,
+      completion_tokens: usage.completion_tokens ?? null,
+      cached_tokens: cachedTokens || null,
+      model: modelToUse,
+      cost_usd: costUsd,
+    });
+    if (txErr) throw txErr;
 
-  // 7b. MYS-45: zapis wygenerowanych bloków do biblioteki
-  const { data: savedPrompts } = await supabaseAdmin
-    .from("prompts")
-    .insert(
-      blocks.map((b) => ({
-        user_id: userId,
-        system_id: system.id,
-        system_version: system.version,
-        prompt: b.prompt,
-        negative: b.negative,
-        format_mode: body.formatMode ?? "together",
-        word_count: b.prompt.trim().split(/\s+/).length,
-        folder_id: null,
-      }))
-    )
-    .select("id");
+    // 7b. MYS-45: zapis wygenerowanych bloków do biblioteki
+    const { data: savedPrompts, error: promptErr } = await supabaseAdmin
+      .from("prompts")
+      .insert(
+        blocks.map((b) => ({
+          user_id: userId,
+          system_id: system.id,
+          system_version: system.version,
+          prompt: b.prompt,
+          negative: b.negative,
+          format_mode: body.formatMode ?? "together",
+          word_count: b.prompt.trim().split(/\s+/).length,
+          folder_id: null,
+        }))
+      )
+      .select("id");
+    if (promptErr) throw promptErr;
 
-  return NextResponse.json({
-    blocks: blocks.map((b, i) => ({ ...b, id: savedPrompts?.[i]?.id ?? null })),
-    creditsRemaining: balanceAfterReserve,
-    systemVersion: system.version,
-    usage, // debug kosztu w fazie kalibracji (MYS-34)
-  });
+    return NextResponse.json({
+      blocks: blocks.map((b, i) => ({ ...b, id: savedPrompts?.[i]?.id ?? null })),
+      creditsRemaining: balanceAfterReserve,
+      systemVersion: system.version,
+      usage, // debug kosztu w fazie kalibracji (MYS-34)
+    });
+  } catch (e) {
+    console.error("Generate persist error:", e instanceof Error ? e.message : "unknown");
+    const refunded = await refundCredits(supabaseAdmin, userId, cost);
+    return NextResponse.json(
+      {
+        error: refunded
+          ? "Nie udało się zapisać wyniku. Kredyty wróciły."
+          : refundFailedMessage(),
+      },
+      { status: 500 }
+    );
+  }
 }

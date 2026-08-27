@@ -5,7 +5,8 @@ Zakres: cała apka na `dev` (API, `lib/`, konsola, login, admin), nie sam diff v
 
 Werdykt: **MVP da się klikać, nie jest gotowe na betę z obcymi userami.**
 Happy path `/api/generate` trzyma rezerwację kredytów i whitelistę modeli.
-Największe dziury: **pierwszy signup = admin**, **webhook dopisuje 100 kredytów by default**, **rate limit nie liczy nieudanych calli LLM** (koszt providera).
+
+**2026-08-27 (ten sam PR co backlog):** załatane C1 (bootstrap admin), C2 (webhook fail-closed + brak default 100), C3 (refund gdy zapis po LLM padnie), C4 (rate limit liczy `generation_attempt`). Reszta High/Medium zostaje w kolejce (T04+).
 
 ---
 
