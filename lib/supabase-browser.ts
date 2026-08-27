@@ -1,16 +1,26 @@
 "use client";
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null = null;
+let loading: Promise<SupabaseClient> | null = null;
 
-export function getSupabaseBrowser(): SupabaseClient {
+export async function getSupabaseBrowser(): Promise<SupabaseClient> {
   if (client) return client;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) {
-    throw new Error("Brak NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+  if (!loading) {
+    loading = (async () => {
+      const res = await fetch("/api/public-config");
+      const cfg = await res.json();
+      if (!cfg.configured || !cfg.url || !cfg.anonKey) {
+        throw new Error(
+          "Brak konfiguracji logowania. Na Vercel dodaj NEXT_PUBLIC_SUPABASE_ANON_KEY (anon public z Supabase) i zrób Redeploy."
+        );
+      }
+      client = createClient(cfg.url, cfg.anonKey, {
+        auth: { persistSession: true, detectSessionInUrl: true, autoRefreshToken: true },
+      });
+      return client;
+    })();
   }
-  client = createClient(url, anon);
-  return client;
+  return loading;
 }

@@ -3,28 +3,50 @@
 import { useState, type CSSProperties } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
+function polishAuthError(message: string) {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login")) return "Zły email lub hasło.";
+  if (m.includes("email not confirmed")) return "Potwierdź email — sprawdź skrzynkę (i spam).";
+  if (m.includes("already registered") || m.includes("already been registered")) {
+    return "To konto już istnieje. Zaznacz zgodę i kliknij Zaloguj.";
+  }
+  if (m.includes("password")) return "Hasło za krótkie (min. 6 znaków) albo odrzucone przez serwer.";
+  return message;
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function signIn(mode: "in" | "up") {
     setBusy(true);
     setError("");
+    setInfo("");
     try {
-      if (!consent) throw new Error("Wymagana akceptacja regulaminu.");
-      const supabase = getSupabaseBrowser();
-      const fn =
-        mode === "up"
-          ? supabase.auth.signUp({ email, password })
-          : supabase.auth.signInWithPassword({ email, password });
-      const { error: authError } = await fn;
-      if (authError) throw authError;
+      if (!consent) throw new Error("Zaznacz checkbox zgody pod hasłem.");
+      if (!email.trim() || !password) throw new Error("Wpisz email i hasło.");
+      const supabase = await getSupabaseBrowser();
+      if (mode === "up") {
+        const { data, error: authError } = await supabase.auth.signUp({ email: email.trim(), password });
+        if (authError) throw authError;
+        if (!data.session) {
+          setInfo("Konto utworzone. Jeśli Supabase wymaga potwierdzenia — otwórz maila, potem wróć i kliknij Zaloguj.");
+          return;
+        }
+      } else {
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (authError) throw authError;
+      }
       window.location.href = "/";
     } catch (e: any) {
-      setError(e.message || "Błąd logowania.");
+      setError(polishAuthError(e.message || "Błąd logowania."));
     } finally {
       setBusy(false);
     }
@@ -32,14 +54,19 @@ export default function LoginPage() {
 
   async function google() {
     if (!consent) {
-      setError("Wymagana akceptacja regulaminu.");
+      setError("Zaznacz checkbox zgody pod hasłem.");
       return;
     }
-    const supabase = getSupabaseBrowser();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/` },
-    });
+    try {
+      const supabase = await getSupabaseBrowser();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/` },
+      });
+      if (error) setError(polishAuthError(error.message));
+    } catch (e: any) {
+      setError(polishAuthError(e.message || "Google niedostępne."));
+    }
   }
 
   return (
@@ -54,6 +81,7 @@ export default function LoginPage() {
         <a href="/terms">Terms of Use</a>.
       </label>
       {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
+      {info && <p style={{ color: "#9f9" }}>{info}</p>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button disabled={busy} onClick={() => signIn("in")} style={btn}>
           Zaloguj

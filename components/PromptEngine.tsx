@@ -28,7 +28,7 @@ const R1_FALLBACK = [
 const ERROR_AXES = ["anatomy", "lighting", "identity", "style", "composition"];
 
 async function authFetch(path: string, init: RequestInit = {}) {
-  const supabase = getSupabaseBrowser();
+  const supabase = await getSupabaseBrowser();
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   const res = await fetch(path, {
@@ -213,7 +213,7 @@ export default function PromptEngine() {
           ))}
           <button
             onClick={async () => {
-              await getSupabaseBrowser().auth.signOut();
+              await getSupabaseBrowser().then((s) => s.auth.signOut());
               window.location.href = "/login";
             }}
             style={{ background: "transparent", color: "#aaa", border: "1px solid #333", padding: "8px 12px", borderRadius: 8 }}
