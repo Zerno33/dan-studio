@@ -25,35 +25,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { calculateCostUsd } from "@/lib/pricing";
 import { checkRateLimit, validateImages } from "@/lib/rate-limit";
+import { ALLOWED_MODEL_SET } from "@/lib/models";
+import { calculateCreditCost, expectedBlockCount } from "@/lib/credits";
+import { chatCompletions } from "@/lib/llm";
 
 // Nigdy nie prerenderować statycznie — endpoint zależy od nagłówka
 // Authorization i env vars w runtime, nie w czasie builda.
 export const dynamic = "force-dynamic";
 
-
-const LITELLM_BASE_URL = process.env.LITELLM_BASE_URL!;
-const LITELLM_MASTER_KEY = process.env.LITELLM_MASTER_KEY!;
-
-// ---------- MYS-36: whitelist modeli ----------
-// Jedyne źródło prawdy o dozwolonych modelach. Nie ufamy modelOverride
-// z requestu bez sprawdzenia — inaczej user woła dowolny model na
-// naszym kluczu i płaci za to 1 kredytem.
-const ALLOWED_MODELS = new Set([
-  "gpt-5.6-luna",
-  "gpt-5.6-terra",
-  "grok-4.3",
-  "grok-4.6",
-]);
-
-// ---------- MYS-38: mnożnik kosztu wg długości ----------
-// R1 nie ma lengthMode (zawsze 1-2 zdania), mnożnik = 1.
-// S1 nie skaluje się przez lengthMode w UI obecnym, ale zostawiamy
-// hook na przyszłość — domyślnie 1.
-const LENGTH_MULTIPLIER: Record<string, number> = {
-  short: 1,
-  std: 1.5,
-  long: 2,
-};
 
 // ---------- typy ----------
 interface GenerateRequest {
@@ -112,7 +91,7 @@ function parseBlocks(raw: string): PromptBlock[] {
 }
 
 // ---------- walidacja wejścia per system ----------
-function validateInput(body: GenerateRequest): { ok: boolean; error?: string } {
+function validateInput(body: GenerateRequest): { ok: true } | { ok: false; error: string } {
   if (body.systemSlug === "n1") {
     if (body.mode === "img" && (!body.images || body.images.length === 0)) {
       return { ok: false, error: "Wrzuć minimum jedną inspirację." };
@@ -138,29 +117,10 @@ function validateInput(body: GenerateRequest): { ok: boolean; error?: string } {
     }
   }
   // MYS-36: whitelist modelu — walidacja wejścia, nie tylko dobór modelu
-  if (body.modelOverride && !ALLOWED_MODELS.has(body.modelOverride)) {
+  if (body.modelOverride && !ALLOWED_MODEL_SET.has(body.modelOverride)) {
     return { ok: false, error: "Niedozwolony model." };
   }
   return { ok: true };
-}
-
-function expectedBlockCount(body: GenerateRequest): number {
-  if (body.systemSlug === "n1") {
-    return body.mode === "img" ? Math.max(body.images?.length ?? 1, 1) : 1;
-  }
-  if (body.systemSlug === "r1") {
-    const noMultiply = body.variant === "analyze" || body.variant === "repair";
-    return noMultiply ? 1 : Math.max(body.count ?? 4, 1);
-  }
-  return 1; // s1
-}
-
-// ---------- MYS-38: koszt w kredytach, z mnożnikiem długości ----------
-function calculateCreditCost(body: GenerateRequest, creditsPerBlock: number): number {
-  const blockCount = expectedBlockCount(body);
-  const lengthMult =
-    body.systemSlug === "r1" ? 1 : LENGTH_MULTIPLIER[body.lengthMode ?? "std"] ?? 1.5;
-  return Math.ceil(blockCount * creditsPerBlock * lengthMult);
 }
 
 // ---------- główny handler ----------
@@ -193,20 +153,20 @@ export async function POST(req: NextRequest) {
 
   // 2. walidacja wejścia (obejmuje whitelist modelu — MYS-36)
   const validation = validateInput(body);
-  if (!validation.ok) {
-    return NextResponse.json({ error: validation.error ?? "Błąd walidacji." }, { status: 400 });
+  if (validation.ok === false) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
   // MYS-40: rozmiar/typ obrazów PRZED jakąkolwiek kosztowną operacją
   const imgValidation = validateImages(body.images);
-  if (!imgValidation.ok) {
-    return NextResponse.json({ error: imgValidation.error ?? "Nieprawidłowe pliki." }, { status: 413 });
+  if (imgValidation.ok === false) {
+    return NextResponse.json({ error: imgValidation.error }, { status: 413 });
   }
 
   // MYS-40: rate limit per user
   const rateCheck = await checkRateLimit(supabaseAdmin, userId);
-  if (!rateCheck.ok) {
-    return NextResponse.json({ error: rateCheck.error ?? "Zbyt wiele żądań." }, { status: 429 });
+  if (rateCheck.ok === false) {
+    return NextResponse.json({ error: rateCheck.error }, { status: 429 });
   }
 
   const { data: system, error: sysError } = await supabaseAdmin
@@ -217,6 +177,11 @@ export async function POST(req: NextRequest) {
 
   if (sysError || !system || !system.is_active) {
     return NextResponse.json({ error: "System niedostępny." }, { status: 404 });
+  }
+
+  const modelToUse = body.modelOverride || system.model;
+  if (!ALLOWED_MODEL_SET.has(modelToUse)) {
+    return NextResponse.json({ error: "Niedozwolony model." }, { status: 400 });
   }
 
   // 3. koszt z mnożnikiem długości (MYS-38) + rezerwacja atomowa (MYS-37)
@@ -282,12 +247,7 @@ export async function POST(req: NextRequest) {
   }
   content.push({ type: "text", text: `${cmdLine}BRIEF: ${body.brief?.trim() || "(brak — pracuj na wejściu)"}` });
 
-  // MYS-36: modelToUse już przeszedł whitelist w validateInput, ale
-  // sprawdzamy drugi raz na wypadek braku modelOverride (fallback na
-  // system.model, który zawsze jest zaufany — pochodzi z bazy).
-  const modelToUse = body.modelOverride || system.model;
-
-  // 6. wywołanie przez LiteLLM proxy
+  // 6. wywołanie modelu (LiteLLM albo direct OpenAI/xAI — MYS-13)
   let raw: string;
   let usage: {
     prompt_tokens?: number;
@@ -296,31 +256,16 @@ export async function POST(req: NextRequest) {
   } = {};
 
   try {
-    const res = await fetch(`${LITELLM_BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${LITELLM_MASTER_KEY}`,
-      },
-      body: JSON.stringify({
-        model: modelToUse,
-        max_tokens: body.systemSlug === "r1" ? 800 : 4000, // R1 nie potrzebuje 4000
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content },
-        ],
-      }),
+    const llm = await chatCompletions({
+      model: modelToUse,
+      maxTokens: body.systemSlug === "r1" ? 800 : 4000,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content },
+      ],
     });
-
-    if (!res.ok) {
-      console.error("LiteLLM error:", res.status); // MYS: nie logować pełnej treści (może zawierać dane usera)
-      await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
-      return NextResponse.json({ error: "Błąd modelu. Spróbuj ponownie." }, { status: 502 });
-    }
-
-    const data = await res.json();
-    raw = data.choices?.[0]?.message?.content ?? "";
-    usage = data.usage ?? {};
+    raw = llm.content;
+    usage = llm.usage;
   } catch (e) {
     console.error("Generate error:", e instanceof Error ? e.message : "unknown");
     await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });

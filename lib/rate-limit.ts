@@ -16,10 +16,12 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB per obraz (przed base64)
 const MAX_TOTAL_IMAGE_BYTES = 25 * 1024 * 1024; // 25 MB suma na request
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
+export type GuardResult = { ok: true } | { ok: false; error: string };
+
 export async function checkRateLimit(
   supabase: SupabaseClient,
   userId: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<GuardResult> {
   const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
@@ -55,7 +57,7 @@ function base64ByteSize(b64: string): number {
 
 export function validateImages(
   images: { base64: string; mime: string }[] | undefined
-): { ok: boolean; error?: string } {
+): GuardResult {
   if (!images || images.length === 0) return { ok: true };
 
   let total = 0;
