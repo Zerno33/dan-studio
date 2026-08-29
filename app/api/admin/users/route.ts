@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const supabaseAdmin = getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, email, is_banned, created_at, credits(balance, plan_type)")
+    .select("id, email, is_banned, created_at, referral_code, referred_by, credits(balance, plan_type)")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

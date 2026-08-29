@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
+import { normalizeReferralCode } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +21,26 @@ export async function GET(req: NextRequest) {
   const email = (user.email || "").toLowerCase();
   const makeAdmin = email && adminEmails().includes(email);
 
-  const { data: profile } = await supabaseAdmin
+  let profileRes = await supabaseAdmin
     .from("profiles")
-    .select("email, is_admin, is_banned, consent_at")
+    .select("email, is_admin, is_banned, consent_at, referred_by, referral_code")
     .eq("id", user.id)
     .single();
+  if (profileRes.error && /referr/i.test(profileRes.error.message)) {
+    profileRes = await supabaseAdmin
+      .from("profiles")
+      .select("email, is_admin, is_banned, consent_at")
+      .eq("id", user.id)
+      .single();
+  }
+  const profile = profileRes.data as {
+    email?: string;
+    is_admin?: boolean;
+    is_banned?: boolean;
+    consent_at?: string | null;
+    referred_by?: string | null;
+    referral_code?: string | null;
+  } | null;
 
   let bootstrapFirstAdmin = false;
   if (!profile?.is_admin && !makeAdmin) {
@@ -82,6 +98,28 @@ export async function GET(req: NextRequest) {
   const isAdmin =
     makeAdmin || bootstrapFirstAdmin || !!profile?.is_admin || !!profilePatch.is_admin;
 
+  const metaCode = normalizeReferralCode(String((user.user_metadata as { referred_by?: string })?.referred_by || ""));
+  if (profile && !profile.referred_by && metaCode && metaCode !== profile.referral_code) {
+    const { data: teacher } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("referral_code", metaCode)
+      .maybeSingle();
+    if (teacher) {
+      await supabaseAdmin.from("profiles").update({ referred_by: metaCode }).eq("id", user.id);
+      profile.referred_by = metaCode;
+    }
+  }
+
+  let referredCount = 0;
+  if (profile?.referral_code) {
+    const { count } = await supabaseAdmin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("referred_by", profile.referral_code);
+    referredCount = count ?? 0;
+  }
+
   return NextResponse.json({
     user: {
       id: user.id,
@@ -89,7 +127,10 @@ export async function GET(req: NextRequest) {
       isAdmin,
       isBanned: !!profile?.is_banned,
       consentAt: profilePatch.consent_at ?? profile?.consent_at ?? null,
+      referralCode: profile?.referral_code ?? null,
+      referredBy: profile?.referred_by ?? null,
     },
+    referredCount,
     credits: credits?.balance ?? 0,
     planType: credits?.plan_type ?? null,
   });

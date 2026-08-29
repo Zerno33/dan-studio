@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 function polishAuthError(message: string) {
@@ -22,6 +22,11 @@ export default function LoginPage() {
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("ref");
+    if (q?.trim()) localStorage.setItem("brns_ref", q.trim().toLowerCase());
+  }, []);
+
   async function signIn(mode: "in" | "up") {
     setBusy(true);
     setError("");
@@ -31,7 +36,12 @@ export default function LoginPage() {
       if (!email.trim() || !password) throw new Error("Wpisz email i hasło.");
       const supabase = await getSupabaseBrowser();
       if (mode === "up") {
-        const { data, error: authError } = await supabase.auth.signUp({ email: email.trim(), password });
+        const ref = typeof window !== "undefined" ? localStorage.getItem("brns_ref") : null;
+        const { data, error: authError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: ref ? { data: { referred_by: ref } } : undefined,
+        });
         if (authError) throw authError;
         if (!data.session) {
           setInfo("Konto utworzone. Jeśli Supabase wymaga potwierdzenia — otwórz maila, potem wróć i kliknij Zaloguj.");

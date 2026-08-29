@@ -5,7 +5,7 @@ import { ALLOWED_MODELS } from "@/lib/models";
 import { calculateCreditCost } from "@/lib/credits";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
-type Tab = "konsola" | "biblioteka" | "admin";
+type Tab = "konsola" | "biblioteka" | "nauczyciel" | "admin";
 type PublicSystem = {
   id: string;
   slug: "n1" | "s1" | "r1";
@@ -261,6 +261,8 @@ export default function PromptEngine() {
   const [tab, setTab] = useState<Tab>("konsola");
   const [email, setEmail] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+  const [referredCount, setReferredCount] = useState(0);
   const [credits, setCredits] = useState<number | null>(null);
   const [systems, setSystems] = useState<PublicSystem[]>([]);
   const [systemSlug, setSystemSlug] = useState<"n1" | "s1" | "r1">("n1");
@@ -310,7 +312,20 @@ export default function PromptEngine() {
         const me = await authFetch("/api/me");
         setEmail(me.user.email || "");
         setIsAdmin(me.user.isAdmin);
+        setReferralCode(me.user.referralCode || "");
+        setReferredCount(me.referredCount || 0);
         setCredits(me.credits);
+        const savedRef = typeof window !== "undefined" ? localStorage.getItem("brns_ref") : null;
+        if (savedRef) {
+          try {
+            await authFetch("/api/me/referral", { method: "POST", body: JSON.stringify({ code: savedRef }) });
+            localStorage.removeItem("brns_ref");
+            const me2 = await authFetch("/api/me");
+            setReferredCount(me2.referredCount || 0);
+          } catch {
+            /* nieznany kod albo kolumna jeszcze nie ma — nie blokuj konsoli */
+          }
+        }
         const sys = await authFetch("/api/systems");
         const list = sys.systems || [];
         setSystems(list);
@@ -466,7 +481,9 @@ export default function PromptEngine() {
           </span>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-          {(["konsola", "biblioteka", ...(isAdmin ? (["admin"] as const) : [])] as Tab[]).map((t) => (
+          {(
+            ["konsola", "biblioteka", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
+          ).map((t) => (
             <Chip
               key={t}
               active={tab === t}
@@ -865,6 +882,29 @@ export default function PromptEngine() {
           </div>
         )}
 
+        {tab === "nauczyciel" && referralCode && (
+          <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 16, maxWidth: 520 }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red, marginBottom: 12 }}>AFILIACJA</div>
+            <p style={{ fontSize: 13, lineHeight: 1.7, color: T.muted }}>
+              Twój kod: <span style={{ color: T.text }}>{referralCode}</span>
+              <br />
+              Poleconych kont: <span style={{ color: T.text }}>{referredCount}</span>
+              <br />
+              Prowizja od płatności — później, jak będzie kasa. Teraz tylko licznik.
+            </p>
+            <button
+              type="button"
+              style={{ ...ghostBtn, marginTop: 12 }}
+              onClick={() => {
+                const url = `${window.location.origin}/login?ref=${encodeURIComponent(referralCode)}`;
+                navigator.clipboard.writeText(url);
+              }}
+            >
+              KOPIUJ LINK
+            </button>
+          </div>
+        )}
+
         {tab === "admin" && isAdmin && (
           <section>
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>USERZY</h2>
@@ -885,6 +925,22 @@ export default function PromptEngine() {
               >
                 <span>{u.email}</span>
                 <span style={{ color: T.muted }}>saldo {u.credits?.balance ?? "—"}</span>
+                <span style={{ color: T.muted, fontSize: 10 }}>ref {u.referral_code || "—"}</span>
+                <button
+                  type="button"
+                  style={ghostBtn}
+                  onClick={async () => {
+                    const code = window.prompt("Kod nauczyciela (puste = wyłącz)", u.referral_code || "");
+                    if (code === null) return;
+                    await authFetch(`/api/admin/users/${u.id}/referral`, {
+                      method: "POST",
+                      body: JSON.stringify({ code }),
+                    });
+                    await loadAdminShell();
+                  }}
+                >
+                  KOD REF
+                </button>
                 <button
                   type="button"
                   style={ghostBtn}
