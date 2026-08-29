@@ -4,6 +4,8 @@ Nie musisz rozumieć kodu. Ty klikasz w panelach i decydujesz produkt. Ja piszę
 
 **Nigdy nie wklejaj kluczy API na czat, na Slacku ani do Gita.** Tylko w Vercel → Environment Variables.
 
+Deploy **tylko z GitHub** (zielony commit, np. `6b9de9f`). Nie `vercel` w terminalu i nie Redeploy czerwonego z 16 plikami — to stary Next 14 i ten błąd w `route.ts:161`.
+
 ---
 
 ## Rytm branchy (vibe-code)

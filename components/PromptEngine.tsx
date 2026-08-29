@@ -376,6 +376,9 @@ export default function PromptEngine() {
   const [libFolderOpen, setLibFolderOpen] = useState(false);
   const [libFolderName, setLibFolderName] = useState("");
   const [adminModal, setAdminModal] = useState<null | { kind: "credits" | "ref"; userId: string; email: string; value: string }>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteCredits, setInviteCredits] = useState("50");
 
   const current = systems.find((s) => s.slug === systemSlug);
   const isR1 = systemSlug === "r1";
@@ -649,6 +652,61 @@ export default function PromptEngine() {
               }}
             >
               ZAPISZ
+            </button>
+          </div>
+        </StudioModal>
+      )}
+      {inviteOpen && (
+        <StudioModal title="ZAPROŚ DO BETY" onClose={() => setInviteOpen(false)}>
+          <input
+            autoFocus
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            placeholder="email"
+            style={{
+              width: "100%",
+              fontFamily: MONO,
+              fontSize: 13,
+              background: T.bg,
+              color: T.text,
+              border: `1px solid ${T.line2}`,
+              padding: 10,
+              marginBottom: 8,
+            }}
+          />
+          <input
+            value={inviteCredits}
+            onChange={(e) => setInviteCredits(e.target.value)}
+            placeholder="kredyty start"
+            style={{
+              width: "100%",
+              fontFamily: MONO,
+              fontSize: 13,
+              background: T.bg,
+              color: T.text,
+              border: `1px solid ${T.line2}`,
+              padding: 10,
+              marginBottom: 12,
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button type="button" style={ghostBtn} onClick={() => setInviteOpen(false)}>
+              ANULUJ
+            </button>
+            <button
+              type="button"
+              style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
+              onClick={async () => {
+                await authFetch("/api/admin/invite", {
+                  method: "POST",
+                  body: JSON.stringify({ email: inviteEmail, credits: Number(inviteCredits) }),
+                });
+                setInviteOpen(false);
+                setInviteEmail("");
+                await loadAdminShell();
+              }}
+            >
+              WYŚLIJ
             </button>
           </div>
         </StudioModal>
@@ -1091,6 +1149,16 @@ export default function PromptEngine() {
                       >
                         KOPIUJ
                       </button>
+                      <button
+                        type="button"
+                        style={ghostBtn}
+                        onClick={async () => {
+                          await authFetch(`/api/prompts/${p.id}`, { method: "DELETE" });
+                          await loadLibrary();
+                        }}
+                      >
+                        USUŃ
+                      </button>
                     </div>
                     <select
                       value={p.folder_id || ""}
@@ -1215,6 +1283,9 @@ export default function PromptEngine() {
             ))}
             {!payouts.length && <p style={{ color: T.muted, fontSize: 11 }}>Brak zgłoszeń.</p>}
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 24 }}>USERZY</h2>
+            <button type="button" style={{ ...ghostBtn, marginBottom: 10 }} onClick={() => setInviteOpen(true)}>
+              ZAPROŚ MAILEM
+            </button>
             {adminUsers.map((u) => (
               <div
                 key={u.id}

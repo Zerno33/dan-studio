@@ -1,3 +1,7 @@
+**PM (klik po kliku, bez IT):** [docs/JAK_PRACUJEMY.md](docs/JAK_PRACUJEMY.md)
+
+---
+
 # DAN STUDIO — PROMPT_ENGINE
 
 SaaS generujący prompty do obrazów AI. Pakuje proprietary systemy **N1 / S1 / R1**
@@ -11,7 +15,7 @@ Platforma generuje **prompty**, nie obrazy.
 
 - **Next.js 14** (App Router) — hosting na Vercel
 - **Supabase** (Postgres + Auth + RLS) — projekt `BRNS SYSTEM`
-- **LiteLLM proxy** na Railway → OpenAI / xAI *(status: do rozstrzygnięcia w MYS-13)*
+- **LLM:** bezpośrednie OpenAI / xAI (domyślnie). LiteLLM tylko gdy `LITELLM_*` jest w env.
 
 ---
 
@@ -103,12 +107,14 @@ bloker przed ustaleniem cennika.
 
 ---
 
-## Znane braki
+## Deploy (Vercel)
 
-- Frontend produkcyjny (MYS-43) — prototyp `prompt_engine_v3.jsx` ma instrukcje
-  systemów w kodzie, **nie może trafić na produkcję w tej formie**
-- MoR / płatności (MYS-23, MYS-24)
-- Decyzja LiteLLM vs bezpośrednie wywołania (MYS-13)
-- BYOK — świadomie odłożone (MYS-44)
+1. Podłącz repo GitHub.
+2. Ustaw zmienne z `.env.example` (minimum: `SUPABASE_*`, `NEXT_PUBLIC_SUPABASE_*`, `OPENAI_API_KEY` i/lub `XAI_API_KEY`).
+3. Lokalnie: `npm run build` musi przejść przed deployem.
+
+Webhook płatności: `POST /api/webhooks/mor` z `MOR_WEBHOOK_SECRET`.
+
+BYOK — świadomie odłożone (MYS-44).
 
 Tracking: Linear, projekt `brns-agnet-8c0035d243de`, prefiks `MYS-*`.
