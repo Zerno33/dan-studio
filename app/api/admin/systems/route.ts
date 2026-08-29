@@ -9,14 +9,18 @@ export const dynamic = "force-dynamic";
 const SYSTEM_COLUMNS =
   "id, slug, label, icon, model, moderation_rule, max_words, credits_per_block, desc_user, inputs_desc, system_prompt, version, is_active, updated_at, created_at";
 
+const META_COLUMNS =
+  "id, slug, label, icon, model, moderation_rule, max_words, credits_per_block, desc_user, inputs_desc, version, is_active, updated_at, created_at";
+
 export async function GET(req: NextRequest) {
   const admin = await requireAdmin(req);
   if (!admin) return NextResponse.json({ error: "Brak dostępu." }, { status: 403 });
 
+  const meta = new URL(req.url).searchParams.get("meta") === "1";
   const supabaseAdmin = getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from("systems")
-    .select(`${SYSTEM_COLUMNS}, system_variants(*)`)
+    .select(`${meta ? META_COLUMNS : SYSTEM_COLUMNS}, system_variants(*)`)
     .order("created_at");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

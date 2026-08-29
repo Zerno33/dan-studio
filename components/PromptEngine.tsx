@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ALLOWED_MODELS } from "@/lib/models";
 import { calculateCreditCost } from "@/lib/credits";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
-type Tab = "console" | "library" | "admin";
+type Tab = "konsola" | "biblioteka" | "admin";
 type PublicSystem = {
   id: string;
   slug: "n1" | "s1" | "r1";
@@ -15,17 +15,53 @@ type PublicSystem = {
   credits_per_block: number;
   desc_user?: string;
   inputs_desc?: string;
-  system_variants?: { slug: string; label: string }[];
 };
 
-const R1_FALLBACK = [
-  { slug: "analyze", label: "ANALYZE" },
-  { slug: "repair", label: "REPAIR" },
-  { slug: "restyle", label: "RESTYLE" },
-  { slug: "angle", label: "ANGLE" },
+const T = {
+  bg: "#0A0A0A",
+  panel: "#141414",
+  panel2: "#1C1C1C",
+  line: "#272727",
+  line2: "#3A3A3A",
+  text: "#EDEDED",
+  muted: "#8A8A8A",
+  red: "#E5152A",
+  green: "#22C55E",
+};
+const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+
+const MODEL_OPTIONS = [
+  { v: "gpt-5.6-luna", l: "GPT-5.6 Luna" },
+  { v: "gpt-5.6-terra", l: "GPT-5.6 Terra" },
+  { v: "grok-4.3", l: "Grok 4.3" },
+  { v: "grok-4.6", l: "Grok 4.6" },
 ];
 
-const ERROR_AXES = ["anatomy", "lighting", "identity", "style", "composition"];
+const R1_VARIANTS = [
+  { id: "standard", label: "standard" },
+  { id: "pose", label: "pose — ciało" },
+  { id: "face", label: "face — ekspresja" },
+  { id: "cam", label: "cam — kadr" },
+  { id: "analyze", label: "analyze — analiza bazy" },
+  { id: "repair", label: "repair — naprawa dryfu" },
+];
+
+const LENGTHS = [
+  { id: "short" as const, l: "110–200" },
+  { id: "std" as const, l: "300–420" },
+  { id: "long" as const, l: "420–520" },
+];
+
+const ERROR_TAGS = [
+  "identity drift",
+  "dłonie / palce",
+  "gaze poza obiektyw",
+  "outfit drift",
+  "światło ≠ scena",
+  "plastikowa skóra",
+  "anatomia",
+  "tło / kadr",
+];
 
 async function authFetch(path: string, init: RequestInit = {}) {
   const supabase = await getSupabaseBrowser();
@@ -44,31 +80,101 @@ async function authFetch(path: string, init: RequestInit = {}) {
   return json;
 }
 
-function fileToImage(file: File): Promise<{ base64: string; mime: string; preview: string }> {
+function fileToImage(file: File): Promise<{ id: string; base64: string; mime: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Nie udało się odczytać pliku."));
     reader.onload = () => {
       const dataUrl = String(reader.result);
       const base64 = dataUrl.split(",")[1] || "";
-      resolve({ base64, mime: file.type, preview: dataUrl });
+      resolve({ id: Math.random().toString(36).slice(2, 10), base64, mime: file.type || "image/jpeg" });
     };
     reader.readAsDataURL(file);
   });
 }
 
+function Chip({
+  children,
+  active,
+  onClick,
+  danger,
+}: {
+  children: ReactNode;
+  active?: boolean;
+  onClick?: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        fontFamily: MONO,
+        fontSize: 11,
+        letterSpacing: "0.06em",
+        color: active ? "#0A0A0A" : T.text,
+        background: active ? (danger ? T.red : "#FFFFFF") : "transparent",
+        border: `1px solid ${active ? "#FFFFFF" : T.line2}`,
+        padding: "4px 10px",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Sel({
+  value,
+  onChange,
+  options,
+  width = 170,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { v: string; l: string }[];
+  width?: number;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        fontFamily: MONO,
+        fontSize: 11,
+        background: T.bg,
+        color: T.text,
+        border: `1px solid ${T.line2}`,
+        width,
+        padding: "4px 8px",
+        colorScheme: "dark",
+      }}
+    >
+      {options.map((o) => (
+        <option key={o.v} value={o.v} style={{ background: T.bg, color: T.text }}>
+          {o.l}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+const Label = ({ children }: { children: ReactNode }) => (
+  <span style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>{children}</span>
+);
+
 export default function PromptEngine() {
-  const [tab, setTab] = useState<Tab>("console");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<Tab>("konsola");
   const [email, setEmail] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
   const [systems, setSystems] = useState<PublicSystem[]>([]);
   const [systemSlug, setSystemSlug] = useState<"n1" | "s1" | "r1">("n1");
   const [mode, setMode] = useState<"img" | "prompt">("img");
-  const [images, setImages] = useState<{ base64: string; mime: string; preview: string }[]>([]);
+  const [images, setImages] = useState<{ id: string; base64: string; mime: string }[]>([]);
   const [pastedPrompt, setPastedPrompt] = useState("");
   const [brief, setBrief] = useState("");
-  const [variant, setVariant] = useState("restyle");
+  const [variant, setVariant] = useState("standard");
   const [count, setCount] = useState(4);
   const [lengthMode, setLengthMode] = useState<"short" | "std" | "long">("std");
   const [modelOverride, setModelOverride] = useState("");
@@ -78,14 +184,20 @@ export default function PromptEngine() {
   const [blocks, setBlocks] = useState<{ id?: string; prompt: string; negative: string }[]>([]);
   const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
   const [library, setLibrary] = useState<any[]>([]);
+  const [activeFolder, setActiveFolder] = useState("all");
+  const [dragOver, setDragOver] = useState(false);
   const [adminSystems, setAdminSystems] = useState<any[]>([]);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [costSummary, setCostSummary] = useState<any>(null);
-  const [ratingsSummary, setRatingsSummary] = useState<any>(null);
-  const [calibration, setCalibration] = useState<any>(null);
-  const [editPrompt, setEditPrompt] = useState<Record<string, string>>({});
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editPrompt, setEditPrompt] = useState("");
+  const [loadErr, setLoadErr] = useState("");
 
   const current = systems.find((s) => s.slug === systemSlug);
+  const isR1 = systemSlug === "r1";
+  const isAnalyze = isR1 && (variant === "analyze" || variant === "repair");
+  const showDrop = !(systemSlug === "n1" && mode === "prompt");
+  const maxImgs = isR1 || systemSlug === "s1" ? 1 : 10;
 
   const previewCost = useMemo(() => {
     if (!current) return 0;
@@ -103,21 +215,61 @@ export default function PromptEngine() {
         setIsAdmin(me.user.isAdmin);
         setCredits(me.credits);
         const sys = await authFetch("/api/systems");
-        setSystems(sys.systems || []);
+        const list = sys.systems || [];
+        setSystems(list);
+        if (!list.length) setLoadErr("Brak systemów w bazie (systems_public).");
         const fol = await authFetch("/api/folders");
         setFolders(fol.folders || []);
       } catch (e: any) {
         if (String(e.message).includes("401") || String(e.message).includes("autoryz")) {
           window.location.href = "/login";
-        }
+        } else setLoadErr(e.message || "Błąd ładowania.");
       }
     })();
   }, []);
+
+  useEffect(() => {
+    const onPaste = async (e: ClipboardEvent) => {
+      if (!showDrop) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const it of Array.from(items)) {
+        if (it.kind === "file" && it.type.startsWith("image/")) {
+          const f = it.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (e.clipboardData?.files?.length) {
+        for (const f of Array.from(e.clipboardData.files)) {
+          if (f.type.startsWith("image/")) files.push(f);
+        }
+      }
+      if (!files.length) return;
+      e.preventDefault();
+      await addFiles(files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [showDrop, images, systemSlug]);
+
+  async function addFiles(fileList: File[] | FileList) {
+    const arr = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
+    const next = [...images];
+    for (const file of arr) {
+      if (next.length >= maxImgs) break;
+      if (isR1 || systemSlug === "s1") {
+        next.splice(0, next.length, await fileToImage(file));
+      } else next.push(await fileToImage(file));
+    }
+    setImages(next.slice(0, maxImgs));
+  }
 
   async function generate() {
     setBusy(true);
     setError("");
     try {
+      if (!systems.length) throw new Error("Brak systemów. Seed N1/S1/R1 w bazie.");
       const json = await authFetch("/api/generate", {
         method: "POST",
         body: JSON.stringify({
@@ -126,9 +278,9 @@ export default function PromptEngine() {
           images: images.map(({ base64, mime }) => ({ base64, mime })),
           pastedPrompt,
           brief,
-          variant: systemSlug === "r1" ? variant : undefined,
-          count: systemSlug === "r1" ? count : undefined,
-          lengthMode: systemSlug === "r1" ? undefined : lengthMode,
+          variant: isR1 ? variant : undefined,
+          count: isR1 ? count : undefined,
+          lengthMode: isR1 ? undefined : lengthMode,
           modelOverride: modelOverride || undefined,
           formatMode,
         }),
@@ -147,289 +299,526 @@ export default function PromptEngine() {
     setLibrary(json.prompts || []);
   }
 
-  async function loadAdmin() {
-    const [sys, users, cost, ratings, cal] = await Promise.all([
-      authFetch("/api/admin/systems"),
+  async function loadAdminShell() {
+    const [sys, users, cost] = await Promise.all([
+      authFetch("/api/admin/systems?meta=1"),
       authFetch("/api/admin/users"),
       authFetch("/api/admin/cost-summary"),
-      authFetch("/api/admin/ratings-summary"),
-      authFetch("/api/admin/calibration"),
     ]);
     setAdminSystems(sys.systems || []);
     setAdminUsers(users.users || []);
     setCostSummary(cost);
-    setRatingsSummary(ratings.summary);
-    setCalibration(cal);
-    const map: Record<string, string> = {};
-    for (const s of sys.systems || []) map[s.id] = s.system_prompt || "";
-    setEditPrompt(map);
+    setEditId(null);
+    setEditPrompt("");
   }
 
-  async function onFiles(files: FileList | null) {
-    if (!files) return;
-    const max = systemSlug === "r1" ? 1 : 10;
-    const next = [...images];
-    for (const file of Array.from(files).slice(0, max)) {
-      if (systemSlug === "r1") {
-        next.splice(0, next.length, await fileToImage(file));
-      } else if (next.length < 10) {
-        next.push(await fileToImage(file));
-      }
-    }
-    setImages(next.slice(0, max));
+  async function openEdit(id: string) {
+    const json = await authFetch(`/api/admin/systems/${id}`);
+    setEditId(id);
+    setEditPrompt(json.system?.system_prompt || "");
   }
 
-  const variants = current?.system_variants?.length ? current.system_variants : R1_FALLBACK;
+  const libFiltered =
+    activeFolder === "all"
+      ? library
+      : library.filter((p) => (activeFolder === "none" ? !p.folder_id : p.folder_id === activeFolder));
+
+  const ghostBtn: CSSProperties = {
+    fontFamily: MONO,
+    fontSize: 10,
+    letterSpacing: "0.08em",
+    padding: "4px 10px",
+    color: T.text,
+    background: "transparent",
+    border: `1px solid ${T.line2}`,
+  };
 
   return (
-    <main style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+    <div style={{ background: T.bg, color: T.text, fontFamily: MONO, minHeight: "100vh" }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "12px 16px",
+          borderBottom: `1px solid ${T.line}`,
+          position: "sticky",
+          top: 0,
+          background: T.bg,
+          zIndex: 10,
+        }}
+      >
         <div>
-          <h1 style={{ color: "#E5152A", margin: 0, fontSize: 22, letterSpacing: 1 }}>PROMPT_ENGINE</h1>
-          <p style={{ margin: "4px 0 0", opacity: 0.7, fontSize: 13 }}>
+          <span style={{ fontSize: 14, letterSpacing: "0.14em", color: T.red }}>PROMPT_ENGINE</span>
+          <span style={{ fontSize: 10, color: T.muted, marginLeft: 8 }}>
             {email}
             {isAdmin ? " · admin" : ""}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ border: "1px solid #333", padding: "6px 10px", borderRadius: 8 }}>
-            Kredyty: {credits ?? "—"}
           </span>
-          {(["console", "library", ...(isAdmin ? (["admin"] as const) : [])] as Tab[]).map((t) => (
-            <button
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          {(["konsola", "biblioteka", ...(isAdmin ? (["admin"] as const) : [])] as Tab[]).map((t) => (
+            <Chip
               key={t}
+              active={tab === t}
               onClick={async () => {
                 setTab(t);
-                if (t === "library") await loadLibrary();
-                if (t === "admin") await loadAdmin();
-              }}
-              style={{
-                background: tab === t ? "#E5152A" : "#1a1a1a",
-                color: "#fff",
-                border: "none",
-                padding: "8px 12px",
-                borderRadius: 8,
+                if (t === "biblioteka") await loadLibrary();
+                if (t === "admin") await loadAdminShell();
               }}
             >
-              {t}
-            </button>
+              {t.toUpperCase()}
+            </Chip>
           ))}
+          <span
+            style={{
+              padding: "4px 10px",
+              fontSize: 11,
+              border: `1px solid ${T.line2}`,
+              color: (credits ?? 0) > 20 ? T.green : T.red,
+            }}
+          >
+            {credits ?? "—"} kredytów
+          </span>
           <button
+            type="button"
+            style={ghostBtn}
             onClick={async () => {
               await getSupabaseBrowser().then((s) => s.auth.signOut());
               window.location.href = "/login";
             }}
-            style={{ background: "transparent", color: "#aaa", border: "1px solid #333", padding: "8px 12px", borderRadius: 8 }}
           >
-            Wyloguj
+            WYLOGUJ
           </button>
         </div>
-      </header>
+      </div>
 
-      {tab === "console" && (
-        <section style={{ marginTop: 24 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-            <label>
-              System
-              <select value={systemSlug} onChange={(e) => setSystemSlug(e.target.value as any)} style={field}>
-                {systems.map((s) => (
-                  <option key={s.slug} value={s.slug}>
-                    {s.icon || ""} {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Model
-              <select value={modelOverride} onChange={(e) => setModelOverride(e.target.value)} style={field}>
-                <option value="">domyślny ({current?.model || "—"})</option>
-                {ALLOWED_MODELS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {systemSlug !== "r1" && (
-              <label>
-                Długość
-                <select value={lengthMode} onChange={(e) => setLengthMode(e.target.value as any)} style={field}>
-                  <option value="short">short</option>
-                  <option value="std">std</option>
-                  <option value="long">long</option>
-                </select>
-              </label>
-            )}
-            <label>
-              Format
-              <select value={formatMode} onChange={(e) => setFormatMode(e.target.value as any)} style={field}>
-                <option value="together">RAZEM</option>
-                <option value="separate">OSOBNO</option>
-              </select>
-            </label>
-            {systemSlug === "r1" && (
-              <>
-                <label>
-                  Wariant
-                  <select value={variant} onChange={(e) => setVariant(e.target.value)} style={field}>
-                    {variants.map((v) => (
-                      <option key={v.slug} value={v.slug}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {variant !== "analyze" && variant !== "repair" && (
-                  <label>
-                    Liczba
-                    <input type="number" min={1} max={10} value={count} onChange={(e) => setCount(Number(e.target.value))} style={field} />
-                  </label>
-                )}
-              </>
-            )}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px" }}>
+        {loadErr && (
+          <div style={{ border: `1px solid ${T.red}`, color: T.red, fontSize: 11, padding: 12, marginBottom: 16 }}>
+            {loadErr}
           </div>
+        )}
 
-          <p style={{ opacity: 0.75, fontSize: 13, marginTop: 12 }}>
-            {current?.desc_user} {current?.inputs_desc}
-          </p>
-          <p style={{ fontSize: 13 }}>
-            Koszt tej operacji: <b>{previewCost}</b> kredytów (ta sama formuła co backend).
-          </p>
-
-          {systemSlug === "n1" && (
-            <div style={{ display: "flex", gap: 8, margin: "12px 0" }}>
-              <button onClick={() => setMode("img")} style={mode === "img" ? activeChip : chip}>
-                ZAŁĄCZNIKI
-              </button>
-              <button onClick={() => setMode("prompt")} style={mode === "prompt" ? activeChip : chip}>
-                PROMPT
-              </button>
-            </div>
-          )}
-
-          {(systemSlug !== "n1" || mode === "img") && (
-            <div>
-              <input type="file" accept="image/png,image/jpeg,image/webp" multiple={systemSlug !== "r1"} onChange={(e) => onFiles(e.target.files)} />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8, marginTop: 10 }}>
-                {images.map((img, i) => (
-                  <img key={i} src={img.preview} alt="" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 8 }} />
-                ))}
+        {tab === "konsola" && (
+          <>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "12px 24px",
+                padding: 12,
+                marginBottom: 20,
+                border: `1px solid ${T.line}`,
+                background: T.panel,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Label>SYSTEM</Label>
+                <Sel
+                  width={120}
+                  value={systemSlug}
+                  onChange={(v) => {
+                    setSystemSlug(v as any);
+                    setImages([]);
+                    setBlocks([]);
+                  }}
+                  options={systems.map((s) => ({ v: s.slug, l: `${s.icon || ""} ${s.label}` }))}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Label>MODEL</Label>
+                <Sel
+                  width={150}
+                  value={modelOverride || current?.model || ALLOWED_MODELS[0]}
+                  onChange={setModelOverride}
+                  options={MODEL_OPTIONS}
+                />
+              </div>
+              {isR1 && (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Label>WARIANT</Label>
+                    <Sel
+                      width={180}
+                      value={variant}
+                      onChange={setVariant}
+                      options={R1_VARIANTS.map((v) => ({ v: v.id, l: v.label }))}
+                    />
+                  </div>
+                  {!isAnalyze && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Label>LICZBA</Label>
+                      <Sel
+                        width={56}
+                        value={String(count)}
+                        onChange={(v) => setCount(Number(v))}
+                        options={Array.from({ length: 10 }, (_, i) => ({ v: String(i + 1), l: String(i + 1) }))}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+              {systemSlug === "n1" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Label>WEJŚCIE</Label>
+                  <Chip active={mode === "img"} onClick={() => setMode("img")}>
+                    ZAŁĄCZNIKI
+                  </Chip>
+                  <Chip active={mode === "prompt"} onClick={() => setMode("prompt")}>
+                    PROMPT
+                  </Chip>
+                </div>
+              )}
+              {!isR1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Label>DŁUGOŚĆ</Label>
+                  <Sel
+                    width={90}
+                    value={lengthMode}
+                    onChange={(v) => setLengthMode(v as any)}
+                    options={LENGTHS.map((l) => ({ v: l.id, l: l.l }))}
+                  />
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Label>FORMAT</Label>
+                <Chip active={formatMode === "together"} onClick={() => setFormatMode("together")}>
+                  RAZEM
+                </Chip>
+                <Chip active={formatMode === "separate"} onClick={() => setFormatMode("separate")}>
+                  OSOBNO
+                </Chip>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: "auto" }}>
+                <span style={{ fontSize: 10, color: T.muted }}>
+                  koszt: <span style={{ color: previewCost > (credits ?? 0) ? T.red : T.text }}>{previewCost}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={generate}
+                  disabled={busy}
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 11,
+                    letterSpacing: "0.1em",
+                    background: busy ? T.line2 : T.red,
+                    color: "#fff",
+                    border: "none",
+                    padding: "8px 20px",
+                  }}
+                >
+                  {busy ? "PRACUJE…" : "URUCHOM"}
+                </button>
               </div>
             </div>
-          )}
 
-          {systemSlug === "n1" && mode === "prompt" && (
-            <textarea value={pastedPrompt} onChange={(e) => setPastedPrompt(e.target.value)} placeholder="Wklej prompt do neutralizacji" style={{ ...field, minHeight: 120, width: "100%" }} />
-          )}
+            {systemSlug === "n1" && mode === "prompt" ? (
+              <div style={{ border: `1px solid ${T.line2}`, background: T.panel, marginBottom: 20 }}>
+                <textarea
+                  value={pastedPrompt}
+                  onChange={(e) => setPastedPrompt(e.target.value)}
+                  placeholder="Wklej cudzy prompt. N1 zdejmie opis wyglądu i zostawi scenę 1:1."
+                  style={{
+                    width: "100%",
+                    minHeight: 150,
+                    background: "transparent",
+                    color: T.text,
+                    fontFamily: MONO,
+                    fontSize: 12.5,
+                    lineHeight: 1.7,
+                    border: "none",
+                    padding: 12,
+                    resize: "vertical",
+                  }}
+                />
+              </div>
+            ) : (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <Label>
+                    {isR1 ? "BAZA — 1 OBRAZ" : systemSlug === "s1" ? "OBRAZ — OPCJONALNY" : `INSPIRACJE — ${images.length}/10`}
+                    {" · drop / Ctrl+V"}
+                  </Label>
+                  {images.length > 0 && (
+                    <button type="button" onClick={() => setImages([])} style={{ ...ghostBtn, color: T.red }}>
+                      WYCZYŚĆ
+                    </button>
+                  )}
+                </div>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    if (e.dataTransfer.files?.length) await addFiles(e.dataTransfer.files);
+                  }}
+                  style={{ display: "flex", flexWrap: "wrap", gap: 12 }}
+                >
+                  {images.map((img, i) => (
+                    <div key={img.id} style={{ position: "relative", width: 112, height: 146, border: `1px solid ${T.line2}` }}>
+                      <img
+                        src={`data:${img.mime};base64,${img.base64}`}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.9 }}
+                      />
+                      <span style={{ position: "absolute", top: 4, left: 4, fontSize: 9, background: T.bg, color: T.red, padding: "0 4px" }}>
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setImages(images.filter((x) => x.id !== img.id))}
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          fontSize: 9,
+                          background: T.bg,
+                          color: T.muted,
+                          border: "none",
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {images.length < maxImgs && (
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      style={{
+                        width: 112,
+                        height: 146,
+                        border: `1px dashed ${dragOver ? T.red : T.line2}`,
+                        background: T.panel,
+                        color: T.muted,
+                        fontSize: 20,
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  hidden
+                  multiple={maxImgs > 1}
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => {
+                    if (e.target.files?.length) addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+            )}
 
-          <textarea value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="Brief (opcjonalnie)" style={{ ...field, minHeight: 80, width: "100%", marginTop: 10 }} />
-
-          {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
-          <button disabled={busy} onClick={generate} style={{ ...activeChip, marginTop: 12, padding: "10px 18px" }}>
-            {busy ? "Generuję…" : "Generuj"}
-          </button>
-
-          <div style={{ marginTop: 24, display: "grid", gap: 12 }}>
-            {blocks.map((b, i) => (
-              <ResultCard
-                key={b.id || i}
-                index={i + 1}
-                block={b}
-                formatMode={formatMode}
-                folders={folders}
-                onFolders={setFolders}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {tab === "library" && (
-        <section style={{ marginTop: 24, display: "grid", gap: 12 }}>
-          {library.map((p) => (
-            <article key={p.id} style={card}>
-              <div style={{ fontSize: 12, opacity: 0.6 }}>{p.created_at} · {p.word_count} słów</div>
-              <pre style={pre}>{p.prompt}</pre>
-              {p.negative ? <pre style={pre}>NEGATIVE: {p.negative}</pre> : null}
-            </article>
-          ))}
-          {!library.length && <p>Brak zapisanych promptów.</p>}
-        </section>
-      )}
-
-      {tab === "admin" && isAdmin && (
-        <section style={{ marginTop: 24 }}>
-          <h2>Systemy</h2>
-          {adminSystems.map((s) => (
-            <article key={s.id} style={card}>
-              <b>{s.label}</b> ({s.slug}) v{s.version}
+            <div style={{ border: `1px solid ${T.line}`, background: T.panel }}>
+              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.1em", padding: "8px 12px 0" }}>
+                BRIEF — opcjonalna notatka dla modelu. Przy S1 może zastąpić zdjęcie. Przy N1/R1 dodatek do wejścia.
+              </div>
               <textarea
-                value={editPrompt[s.id] ?? ""}
-                onChange={(e) => setEditPrompt((m) => ({ ...m, [s.id]: e.target.value }))}
-                style={{ ...field, width: "100%", minHeight: 140, marginTop: 8 }}
+                value={brief}
+                onChange={(e) => setBrief(e.target.value)}
+                placeholder={
+                  isR1
+                    ? "Opcjonalny kierunek serii…"
+                    : "Np. złote światło, wieczór. Puste = pracuj wyłącznie na wejściu."
+                }
+                style={{
+                  width: "100%",
+                  minHeight: 64,
+                  background: "transparent",
+                  color: T.text,
+                  fontFamily: MONO,
+                  fontSize: 12,
+                  border: "none",
+                  padding: 12,
+                  resize: "vertical",
+                }}
               />
-              <button
-                style={chip}
-                onClick={async () => {
-                  await authFetch(`/api/admin/systems/${s.id}`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ systemPrompt: editPrompt[s.id] }),
-                  });
-                  await loadAdmin();
-                }}
-              >
-                Zapisz instrukcję
-              </button>
-            </article>
-          ))}
-
-          <h2>Użytkownicy</h2>
-          {adminUsers.map((u) => (
-            <div key={u.id} style={{ ...card, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <span>{u.email}</span>
-              <span>saldo {u.credits?.balance ?? "—"}</span>
-              <button
-                style={chip}
-                onClick={async () => {
-                  const amount = Number(prompt("Ile kredytów dodać?", "50"));
-                  if (!Number.isFinite(amount)) return;
-                  await authFetch(`/api/admin/users/${u.id}/credits`, {
-                    method: "POST",
-                    body: JSON.stringify({ amount }),
-                  });
-                  await loadAdmin();
-                }}
-              >
-                Kredyty
-              </button>
-              <button
-                style={chip}
-                onClick={async () => {
-                  await authFetch(`/api/admin/users/${u.id}/ban`, {
-                    method: "POST",
-                    body: JSON.stringify({ banned: !u.is_banned }),
-                  });
-                  await loadAdmin();
-                }}
-              >
-                {u.is_banned ? "Odbanuj" : "Ban"}
-              </button>
             </div>
-          ))}
+            <div style={{ fontSize: 10, color: T.muted, marginTop: 8, lineHeight: 1.8 }}>
+              {current?.desc_user} {current?.inputs_desc}
+            </div>
+            {error && (
+              <div style={{ marginTop: 16, padding: 12, border: `1px solid ${T.red}`, color: T.red, fontSize: 11 }}>
+                {error}
+              </div>
+            )}
 
-          <h2>Koszt / marża</h2>
-          <pre style={pre}>{JSON.stringify(costSummary?.summary ?? {}, null, 2)}</pre>
-          <h2>Oceny</h2>
-          <pre style={pre}>{JSON.stringify(ratingsSummary ?? {}, null, 2)}</pre>
-          <h2>Kalibracja (ostatnie 20)</h2>
-          <pre style={pre}>{JSON.stringify(calibration ?? {}, null, 2)}</pre>
-        </section>
-      )}
+            <div style={{ marginTop: 32 }}>
+              {blocks.map((b, i) => (
+                <ResultCard
+                  key={b.id || i}
+                  index={i + 1}
+                  block={b}
+                  formatMode={formatMode}
+                  folders={folders}
+                  onFolders={setFolders}
+                />
+              ))}
+              {!blocks.length && !busy && (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: 56,
+                    border: `1px dashed ${T.line}`,
+                    color: T.muted,
+                    fontSize: 11,
+                    lineHeight: 2,
+                  }}
+                >
+                  Wybierz system, wrzuć wejście (drop albo Ctrl+V), uruchom.
+                  <br />
+                  N1 z pięcioma zdjęciami zwróci pięć osobnych bloków.
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
-      <footer style={{ marginTop: 48, fontSize: 12, opacity: 0.55 }}>
-        Output jest treścią wygenerowaną przez AI. <a href="/terms">Terms of Use</a>
-      </footer>
-    </main>
+        {tab === "biblioteka" && (
+          <div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+              <Chip active={activeFolder === "all"} onClick={() => setActiveFolder("all")}>
+                WSZYSTKIE ({library.length})
+              </Chip>
+              <Chip active={activeFolder === "none"} onClick={() => setActiveFolder("none")}>
+                BEZ FOLDERU
+              </Chip>
+              {folders.map((f) => (
+                <Chip key={f.id} active={activeFolder === f.id} onClick={() => setActiveFolder(f.id)}>
+                  {f.name}
+                </Chip>
+              ))}
+            </div>
+            {libFiltered.map((p) => (
+              <article key={p.id} style={{ border: `1px solid ${T.line}`, background: T.panel, marginBottom: 12, padding: 12 }}>
+                <div style={{ fontSize: 10, color: T.muted }}>
+                  {p.created_at} · {p.word_count} słów
+                </div>
+                <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: "8px 0 0" }}>{p.prompt}</pre>
+              </article>
+            ))}
+            {!libFiltered.length && <p style={{ color: T.muted, fontSize: 11 }}>Brak promptów.</p>}
+          </div>
+        )}
+
+        {tab === "admin" && isAdmin && (
+          <section>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>USERZY</h2>
+            {adminUsers.map((u) => (
+              <div
+                key={u.id}
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  alignItems: "center",
+                  border: `1px solid ${T.line}`,
+                  background: T.panel,
+                  padding: 10,
+                  marginBottom: 8,
+                  fontSize: 12,
+                }}
+              >
+                <span>{u.email}</span>
+                <span style={{ color: T.muted }}>saldo {u.credits?.balance ?? "—"}</span>
+                <button
+                  type="button"
+                  style={ghostBtn}
+                  onClick={async () => {
+                    const amount = Number(prompt("Ile kredytów dodać?", "50"));
+                    if (!Number.isFinite(amount)) return;
+                    await authFetch(`/api/admin/users/${u.id}/credits`, {
+                      method: "POST",
+                      body: JSON.stringify({ amount }),
+                    });
+                    await loadAdminShell();
+                  }}
+                >
+                  KREDYTY
+                </button>
+                <button
+                  type="button"
+                  style={ghostBtn}
+                  onClick={async () => {
+                    await authFetch(`/api/admin/users/${u.id}/ban`, {
+                      method: "POST",
+                      body: JSON.stringify({ banned: !u.is_banned }),
+                    });
+                    await loadAdminShell();
+                  }}
+                >
+                  {u.is_banned ? "ODBANUJ" : "BAN"}
+                </button>
+              </div>
+            ))}
+
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>KOSZT</h2>
+            <pre style={{ fontSize: 11, color: T.muted, background: T.panel, padding: 12, border: `1px solid ${T.line}` }}>
+              {JSON.stringify(costSummary?.summary ?? {}, null, 2)}
+            </pre>
+
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>SYSTEMY</h2>
+            {adminSystems.map((s) => (
+              <article key={s.id} style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 12, marginBottom: 12 }}>
+                <b>
+                  {s.label} ({s.slug})
+                </b>{" "}
+                v{s.version}
+                {editId === s.id ? (
+                  <>
+                    <textarea
+                      value={editPrompt}
+                      onChange={(e) => setEditPrompt(e.target.value)}
+                      style={{
+                        width: "100%",
+                        minHeight: 180,
+                        marginTop: 8,
+                        background: T.bg,
+                        color: T.text,
+                        border: `1px solid ${T.line2}`,
+                        fontFamily: MONO,
+                        fontSize: 12,
+                        padding: 8,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      style={{ ...ghostBtn, marginTop: 8, background: T.red, color: "#fff", borderColor: T.red }}
+                      onClick={async () => {
+                        await authFetch(`/api/admin/systems/${s.id}`, {
+                          method: "PATCH",
+                          body: JSON.stringify({ systemPrompt: editPrompt }),
+                        });
+                        setEditId(null);
+                        await loadAdminShell();
+                      }}
+                    >
+                      ZAPISZ INSTRUKCJĘ
+                    </button>
+                  </>
+                ) : (
+                  <div>
+                    <button type="button" style={{ ...ghostBtn, marginTop: 8 }} onClick={() => openEdit(s.id)}>
+                      EDYTUJ INSTRUKCJĘ
+                    </button>
+                  </div>
+                )}
+              </article>
+            ))}
+          </section>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -448,114 +837,117 @@ function ResultCard({
 }) {
   const [openRate, setOpenRate] = useState(false);
   const words = block.prompt.trim().split(/\s+/).filter(Boolean).length;
-
-  async function copy(text: string) {
-    await navigator.clipboard.writeText(text);
-  }
+  const full = block.negative ? `${block.prompt}\n\nNegative prompt: ${block.negative}` : block.prompt;
+  const ghostBtn: CSSProperties = {
+    fontFamily: MONO,
+    fontSize: 10,
+    letterSpacing: "0.08em",
+    padding: "4px 10px",
+    color: T.text,
+    background: "transparent",
+    border: `1px solid ${T.line2}`,
+  };
 
   return (
-    <article style={card}>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <b>Blok {index}</b>
-        <span>{words} słów</span>
-      </div>
-      <pre style={pre}>{block.prompt}</pre>
-      {block.negative ? <pre style={pre}>NEGATIVE: {block.negative}</pre> : null}
-      {formatMode === "together" ? (
-        <button style={chip} onClick={() => copy(`${block.prompt}\n\nNEGATIVE: ${block.negative}`)}>
-          KOPIUJ
-        </button>
-      ) : (
-        <>
-          <button style={chip} onClick={() => copy(block.prompt)}>
-            KOPIUJ PROMPT
-          </button>
-          <button style={chip} onClick={() => copy(block.negative)}>
-            KOPIUJ NEGATIVE
-          </button>
-        </>
-      )}
-      <select
-        style={{ ...field, width: 220, display: "inline-block", marginLeft: 8 }}
-        defaultValue=""
-        onChange={async (e) => {
-          const val = e.target.value;
-          if (!val || !block.id) return;
-          if (val === "__new") {
-            const name = prompt("Nazwa folderu");
-            if (!name) return;
-            const json = await authFetch("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
-            onFolders([json.folder, ...folders]);
-            await authFetch(`/api/prompts/${block.id}`, { method: "PATCH", body: JSON.stringify({ folderId: json.folder.id }) });
-            return;
-          }
-          await authFetch(`/api/prompts/${block.id}`, { method: "PATCH", body: JSON.stringify({ folderId: val }) });
+    <div style={{ marginBottom: 16, border: `1px solid ${T.line}`, background: T.panel }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "8px 12px",
+          borderBottom: `1px solid ${T.line}`,
         }}
       >
-        <option value="">+ Dodaj do folderu</option>
-        <option value="__new">Nowy folder…</option>
-        {folders.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.name}
-          </option>
-        ))}
-      </select>
-      <div>
-        <button style={{ ...chip, marginTop: 8 }} onClick={() => setOpenRate((v) => !v)}>
-          oceń render
-        </button>
-      </div>
-      {openRate && block.id && (
-        <div style={{ marginTop: 8 }}>
-          {ERROR_AXES.map((tag) => (
-            <button
-              key={tag}
-              style={chip}
-              onClick={() =>
-                authFetch("/api/ratings", {
-                  method: "POST",
-                  body: JSON.stringify({ promptId: block.id, verdict: "fail", tags: [tag] }),
-                })
+        <span style={{ fontSize: 11, color: T.red, letterSpacing: "0.08em" }}>
+          &gt;_ {String(index).padStart(2, "0")}
+          <span style={{ color: T.muted, marginLeft: 10 }}>{words} słów</span>
+        </span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <select
+            defaultValue=""
+            style={{ fontFamily: MONO, fontSize: 10, background: T.bg, color: T.text, border: `1px solid ${T.line2}`, padding: "3px 6px", colorScheme: "dark" }}
+            onChange={async (e) => {
+              const val = e.target.value;
+              e.target.value = "";
+              if (!val || !block.id) return;
+              if (val === "__new") {
+                const name = prompt("Nazwa folderu");
+                if (!name) return;
+                const json = await authFetch("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
+                onFolders([json.folder, ...folders]);
+                await authFetch(`/api/prompts/${block.id}`, { method: "PATCH", body: JSON.stringify({ folderId: json.folder.id }) });
+                return;
               }
-            >
-              {tag}
-            </button>
-          ))}
-          <button
-            style={activeChip}
-            onClick={() =>
-              authFetch("/api/ratings", {
-                method: "POST",
-                body: JSON.stringify({ promptId: block.id, verdict: "pass", tags: [] }),
-              })
-            }
+              await authFetch(`/api/prompts/${block.id}`, { method: "PATCH", body: JSON.stringify({ folderId: val }) });
+            }}
           >
-            PASS
+            <option value="">+ Dodaj do folderu</option>
+            <option value="__new">+ nowy folder…</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" style={ghostBtn} onClick={() => navigator.clipboard.writeText(formatMode === "together" ? full : block.prompt)}>
+            KOPIUJ
           </button>
+          {formatMode === "separate" && block.negative && (
+            <button type="button" style={ghostBtn} onClick={() => navigator.clipboard.writeText(block.negative)}>
+              KOPIUJ NEGATIVE
+            </button>
+          )}
+        </div>
+      </div>
+      <pre style={{ padding: 12, whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.75, margin: 0 }}>{block.prompt}</pre>
+      {block.negative && formatMode === "together" && (
+        <div style={{ padding: "0 12px 12px" }}>
+          <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 4 }}>NEGATIVE</div>
+          <pre style={{ whiteSpace: "pre-wrap", fontSize: 11.5, margin: 0, color: T.muted }}>{block.negative}</pre>
         </div>
       )}
-    </article>
+      <div style={{ padding: "6px 12px", borderTop: `1px solid ${T.line}`, background: T.panel2 }}>
+        {!openRate ? (
+          <button
+            type="button"
+            onClick={() => setOpenRate(true)}
+            style={{ fontFamily: MONO, fontSize: 9.5, color: T.muted, background: "none", border: "none" }}
+          >
+            oceń render
+          </button>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "6px 0" }}>
+            <Chip
+              active={false}
+              onClick={() =>
+                block.id &&
+                authFetch("/api/ratings", { method: "POST", body: JSON.stringify({ promptId: block.id, verdict: "pass", tags: [] }) })
+              }
+            >
+              PASS
+            </Chip>
+            {ERROR_TAGS.map((tag) => (
+              <Chip
+                key={tag}
+                danger
+                onClick={() =>
+                  block.id &&
+                  authFetch("/api/ratings", {
+                    method: "POST",
+                    body: JSON.stringify({ promptId: block.id, verdict: "fail", tags: [tag] }),
+                  })
+                }
+              >
+                {tag}
+              </Chip>
+            ))}
+            <button type="button" onClick={() => setOpenRate(false)} style={{ fontFamily: MONO, fontSize: 9.5, color: T.muted, background: "none", border: "none" }}>
+              zwiń
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
-
-const field: CSSProperties = {
-  display: "block",
-  width: "100%",
-  marginTop: 4,
-  background: "#141414",
-  color: "#ededed",
-  border: "1px solid #333",
-  borderRadius: 8,
-  padding: 8,
-};
-const chip: CSSProperties = {
-  background: "#1a1a1a",
-  color: "#fff",
-  border: "1px solid #333",
-  padding: "6px 10px",
-  borderRadius: 8,
-  marginRight: 6,
-};
-const activeChip: React.CSSProperties = { ...chip, background: "#E5152A", borderColor: "#E5152A" };
-const card: CSSProperties = { background: "#121212", border: "1px solid #2a2a2a", borderRadius: 12, padding: 14 };
-const pre: CSSProperties = { whiteSpace: "pre-wrap", fontSize: 13, background: "#0d0d0d", padding: 10, borderRadius: 8 };

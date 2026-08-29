@@ -11,6 +11,14 @@ export type ChatResult = {
   usage: ChatUsage;
 };
 
+function openaiKey() {
+  return process.env.OPENAI_API_KEY || "";
+}
+
+function xaiKey() {
+  return process.env.XAI_API_KEY || "";
+}
+
 function resolveProviderModel(productModel: string): { url: string; key: string; model: string } {
   const litellmUrl = process.env.LITELLM_BASE_URL?.replace(/\/$/, "");
   const litellmKey = process.env.LITELLM_MASTER_KEY;
@@ -23,29 +31,30 @@ function resolveProviderModel(productModel: string): { url: string; key: string;
   }
 
   const isGrok = productModel.startsWith("grok-");
-  if (isGrok) {
-    const key = process.env.XAI_API_KEY;
-    if (!key) {
-      throw new Error("Brak XAI_API_KEY (i LiteLLM nie jest skonfigurowany).");
-    }
+  if (isGrok && xaiKey()) {
     const mapped =
       productModel === "grok-4.6"
         ? process.env.XAI_MODEL_46 || "grok-3"
         : process.env.XAI_MODEL_43 || "grok-3";
     return {
       url: "https://api.x.ai/v1/chat/completions",
-      key,
+      key: xaiKey(),
       model: mapped,
     };
   }
 
-  const key = process.env.OPENAI_API_KEY;
+  const key = openaiKey();
   if (!key) {
-    throw new Error("Brak OPENAI_API_KEY (i LiteLLM nie jest skonfigurowany).");
+    throw new Error(
+      isGrok
+        ? "Brak XAI_API_KEY i OPENAI_API_KEY — nie da się wywołać modelu."
+        : "Brak OPENAI_API_KEY (i LiteLLM nie jest skonfigurowany)."
+    );
   }
+
   const mapped =
     productModel === "gpt-5.6-terra"
-      ? process.env.OPENAI_MODEL_TERRA || "gpt-4o"
+      ? process.env.OPENAI_MODEL_TERRA || process.env.OPENAI_MODEL_LUNA || "gpt-4o"
       : process.env.OPENAI_MODEL_LUNA || "gpt-4o-mini";
   return {
     url: "https://api.openai.com/v1/chat/completions",
@@ -54,32 +63,65 @@ function resolveProviderModel(productModel: string): { url: string; key: string;
   };
 }
 
+const OPENAI_FALLBACKS = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"];
+
+export function userFacingLlmError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : "unknown";
+  if (msg.includes("Brak OPENAI") || msg.includes("Brak XAI")) return msg;
+  if (msg.startsWith("LLM_HTTP_401") || msg.startsWith("LLM_HTTP_403")) {
+    return "Klucz modelu odrzucony. Sprawdź OPENAI_API_KEY / XAI_API_KEY na Vercel.";
+  }
+  if (msg.startsWith("LLM_HTTP_404") || msg.startsWith("LLM_HTTP_400")) {
+    return "Model niedostępny u providera. Ustaw OPENAI_MODEL_LUNA na działającą nazwę (np. gpt-4o-mini).";
+  }
+  if (msg.startsWith("LLM_HTTP_429")) return "Limit zapytań u providera. Poczekaj chwilę.";
+  return "Błąd połączenia z modelem.";
+}
+
+async function postChat(
+  url: string,
+  key: string,
+  model: string,
+  maxTokens: number,
+  messages: unknown[]
+): Promise<{ ok: true; data: any } | { ok: false; status: number }> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
+  });
+  if (!res.ok) return { ok: false, status: res.status };
+  return { ok: true, data: await res.json() };
+}
+
 export async function chatCompletions(args: {
   model: string;
   maxTokens: number;
   messages: unknown[];
 }): Promise<ChatResult> {
   const target = resolveProviderModel(args.model);
-  const res = await fetch(target.url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${target.key}`,
-    },
-    body: JSON.stringify({
-      model: target.model,
-      max_tokens: args.maxTokens,
-      messages: args.messages,
-    }),
-  });
+  let result = await postChat(target.url, target.key, target.model, args.maxTokens, args.messages);
 
-  if (!res.ok) {
-    throw new Error(`LLM_HTTP_${res.status}`);
+  const isOpenAi = target.url.includes("openai.com");
+  if (result.ok === false && isOpenAi && (result.status === 400 || result.status === 404)) {
+    for (const fb of OPENAI_FALLBACKS) {
+      if (fb === target.model) continue;
+      console.error("LLM retry model:", fb);
+      result = await postChat(target.url, target.key, fb, args.maxTokens, args.messages);
+      if (result.ok) break;
+    }
   }
 
-  const data = await res.json();
+  if (result.ok === false) {
+    console.error("LLM HTTP:", result.status);
+    throw new Error(`LLM_HTTP_${result.status}`);
+  }
+
   return {
-    content: data.choices?.[0]?.message?.content ?? "",
-    usage: data.usage ?? {},
+    content: result.data.choices?.[0]?.message?.content ?? "",
+    usage: result.data.usage ?? {},
   };
 }

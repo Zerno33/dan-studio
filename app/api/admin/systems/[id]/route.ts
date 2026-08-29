@@ -9,6 +9,19 @@ export const dynamic = "force-dynamic";
 const SYSTEM_COLUMNS =
   "id, slug, label, icon, model, moderation_rule, max_words, credits_per_block, desc_user, inputs_desc, system_prompt, version, is_active, updated_at, created_at";
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const admin = await requireAdmin(req);
+  if (!admin) return NextResponse.json({ error: "Brak dostępu." }, { status: 403 });
+  const { id } = await params;
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data, error } = await supabaseAdmin.from("systems").select(SYSTEM_COLUMNS).eq("id", id).single();
+  if (error || !data) return NextResponse.json({ error: "System nie znaleziony." }, { status: 404 });
+  return NextResponse.json({ system: data });
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -27,7 +27,7 @@ import { calculateCostUsd } from "@/lib/pricing";
 import { checkRateLimit, validateImages, type GuardResult } from "@/lib/rate-limit";
 import { ALLOWED_MODEL_SET } from "@/lib/models";
 import { calculateCreditCost, expectedBlockCount } from "@/lib/credits";
-import { chatCompletions } from "@/lib/llm";
+import { chatCompletions, userFacingLlmError } from "@/lib/llm";
 
 // Nigdy nie prerenderować statycznie — endpoint zależy od nagłówka
 // Authorization i env vars w runtime, nie w czasie builda.
@@ -274,7 +274,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("Generate error:", e instanceof Error ? e.message : "unknown");
     await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
-    return NextResponse.json({ error: "Błąd połączenia z modelem." }, { status: 502 });
+    return NextResponse.json({ error: userFacingLlmError(e) }, { status: 502 });
   }
 
   const blocks = parseBlocks(raw);
