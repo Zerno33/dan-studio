@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
-import { normalizeReferralCode } from "@/lib/referral";
+import { normalizeReferralCode, linkReferralRow } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +116,7 @@ export async function GET(req: NextRequest) {
     if (teacher) {
       await supabaseAdmin.from("profiles").update({ referred_by: metaCode }).eq("id", user.id);
       profile.referred_by = metaCode;
+      await linkReferralRow(supabaseAdmin, teacher.id, user.id);
     }
   }
 

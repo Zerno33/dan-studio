@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
-import { normalizeReferralCode } from "@/lib/referral";
+import { normalizeReferralCode, linkReferralRow } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -34,5 +34,6 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("profiles").update({ referred_by: code }).eq("id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await linkReferralRow(supabaseAdmin, teacher.id, user.id);
   return NextResponse.json({ ok: true });
 }

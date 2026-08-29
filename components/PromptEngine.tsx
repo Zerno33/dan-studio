@@ -336,6 +336,13 @@ export default function PromptEngine() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [referredCount, setReferredCount] = useState(0);
+  const [teacherStats, setTeacherStats] = useState<{
+    referrals: { id: string; email: string; status: string; commission: number }[];
+    activeCount: number;
+    commissionTotal: number;
+    payoutPending: boolean;
+  } | null>(null);
+  const [payouts, setPayouts] = useState<{ id: string; email: string; status: string; created_at: string }[]>([]);
   const [credits, setCredits] = useState<number | null>(null);
   const [systems, setSystems] = useState<PublicSystem[]>([]);
   const [systemSlug, setSystemSlug] = useState<"n1" | "s1" | "r1">("n1");
@@ -498,16 +505,24 @@ export default function PromptEngine() {
   }
 
   async function loadAdminShell() {
-    const [sys, users, cost] = await Promise.all([
+    const [sys, users, cost, pay] = await Promise.all([
       authFetch("/api/admin/systems?meta=1"),
       authFetch("/api/admin/users"),
       authFetch("/api/admin/cost-summary"),
+      authFetch("/api/admin/payouts").catch(() => ({ payouts: [] })),
     ]);
     setAdminSystems(sys.systems || []);
     setAdminUsers(users.users || []);
     setCostSummary(cost);
+    setPayouts(pay.payouts || []);
     setEditId(null);
     setEditPrompt("");
+  }
+
+  async function loadTeacher() {
+    const json = await authFetch("/api/referrals");
+    setTeacherStats(json);
+    setReferredCount((json.referrals || []).length);
   }
 
   async function finishOnboarding() {
@@ -575,6 +590,7 @@ export default function PromptEngine() {
               onClick={async () => {
                 setTab(t);
                 if (t === "biblioteka") await loadLibrary();
+                if (t === "nauczyciel") await loadTeacher();
                 if (t === "admin") await loadAdminShell();
               }}
             >
@@ -968,31 +984,91 @@ export default function PromptEngine() {
         )}
 
         {tab === "nauczyciel" && referralCode && (
-          <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 16, maxWidth: 520 }}>
-            <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red, marginBottom: 12 }}>AFILIACJA</div>
-            <p style={{ fontSize: 13, lineHeight: 1.7, color: T.muted }}>
-              Twój kod: <span style={{ color: T.text }}>{referralCode}</span>
-              <br />
-              Poleconych kont: <span style={{ color: T.text }}>{referredCount}</span>
-              <br />
-              Prowizja od płatności — później, jak będzie kasa. Teraz tylko licznik.
-            </p>
-            <button
-              type="button"
-              style={{ ...ghostBtn, marginTop: 12 }}
-              onClick={() => {
-                const url = `${window.location.origin}/login?ref=${encodeURIComponent(referralCode)}`;
-                navigator.clipboard.writeText(url);
-              }}
-            >
-              KOPIUJ LINK
-            </button>
+          <div style={{ maxWidth: 640 }}>
+            <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red, marginBottom: 12 }}>AFILIACJA</div>
+              <p style={{ fontSize: 13, lineHeight: 1.7, color: T.muted }}>
+                Kod: <span style={{ color: T.text }}>{referralCode}</span>
+                <br />
+                Poleceni: {teacherStats?.referrals.length ?? referredCount} · aktywni: {teacherStats?.activeCount ?? "—"}
+                <br />
+                Prowizja (zł): {teacherStats?.commissionTotal ?? 0} — naliczanie po płatnościach, jeszcze nie.
+              </p>
+              <button
+                type="button"
+                style={{ ...ghostBtn, marginTop: 12, marginRight: 8 }}
+                onClick={() => {
+                  const url = `${window.location.origin}/login?ref=${encodeURIComponent(referralCode)}`;
+                  navigator.clipboard.writeText(url);
+                }}
+              >
+                KOPIUJ LINK
+              </button>
+              <button
+                type="button"
+                style={ghostBtn}
+                disabled={teacherStats?.payoutPending}
+                onClick={async () => {
+                  await authFetch("/api/referrals", { method: "POST" });
+                  await loadTeacher();
+                }}
+              >
+                {teacherStats?.payoutPending ? "CZEKA NA WYPŁATĘ" : "ZLEĆ WYPŁATĘ"}
+              </button>
+            </div>
+            {(teacherStats?.referrals || []).map((r) => (
+              <div
+                key={r.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  border: `1px solid ${T.line}`,
+                  padding: 10,
+                  marginBottom: 6,
+                  fontSize: 12,
+                }}
+              >
+                <span>{r.email}</span>
+                <span style={{ color: T.muted }}>{r.status}</span>
+              </div>
+            ))}
           </div>
         )}
 
         {tab === "admin" && isAdmin && (
           <section>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>USERZY</h2>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>WYPŁATY NAUCZYCIELI</h2>
+            {payouts.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  border: `1px solid ${T.line}`,
+                  padding: 8,
+                  marginBottom: 6,
+                  fontSize: 12,
+                }}
+              >
+                <span>{p.email}</span>
+                <span style={{ color: T.muted }}>{p.status}</span>
+                {p.status === "pending" && (
+                  <button
+                    type="button"
+                    style={ghostBtn}
+                    onClick={async () => {
+                      await authFetch("/api/admin/payouts", { method: "POST", body: JSON.stringify({ id: p.id, status: "done" }) });
+                      await loadAdminShell();
+                    }}
+                  >
+                    OZNACZ WYPŁACONE
+                  </button>
+                )}
+              </div>
+            ))}
+            {!payouts.length && <p style={{ color: T.muted, fontSize: 11 }}>Brak zgłoszeń.</p>}
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 24 }}>USERZY</h2>
             {adminUsers.map((u) => (
               <div
                 key={u.id}
