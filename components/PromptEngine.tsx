@@ -256,6 +256,79 @@ const Label = ({ children }: { children: ReactNode }) => (
   <span style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>{children}</span>
 );
 
+function OnboardingGuide({
+  systems,
+  onDone,
+}: {
+  systems: PublicSystem[];
+  onDone: () => void;
+}) {
+  const [step, setStep] = useState(0);
+  const steps = [
+    {
+      t: "SYSTEM",
+      b: "N1 = scena ze zdjęć. S1 = styl / look. R1 = seria wariantów z jednej bazy. Wybierz na górze konsoli.",
+    },
+    {
+      t: "WEJŚCIE",
+      b: "Wrzuć zdjęcie (klik, drop albo Ctrl+V). N1 może też pracować na wklejonym prompcie zamiast zdjęcia.",
+    },
+    {
+      t: "URUCHOM",
+      b: "Czerwony przycisk na dole lewej kolumny. Zużywa kredyty. Wynik to tekst do kopiowania, nie obraz.",
+    },
+    {
+      t: "KOPIUJ",
+      b: "Przy bloku: KOPIUJ. Potem BIBLIOTEKA — historia i foldery.",
+    },
+  ];
+  const s = steps[step];
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.78)",
+        zIndex: 90,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 440, background: T.panel, border: `1px solid ${T.line2}`, padding: 20, fontFamily: MONO }}>
+        <div style={{ fontSize: 11, color: T.red, letterSpacing: "0.12em" }}>
+          PIERWSZE WEJŚCIE {step + 1}/{steps.length}
+        </div>
+        <h2 style={{ fontSize: 16, margin: "12px 0 8px" }}>{s.t}</h2>
+        <p style={{ fontSize: 13, lineHeight: 1.7, color: T.muted }}>{s.b}</p>
+        {step === 0 && (
+          <ul style={{ fontSize: 12, color: T.text, lineHeight: 1.8, paddingLeft: 18 }}>
+            {systems.slice(0, 3).map((sys) => (
+              <li key={sys.slug}>
+                <strong>{sys.label}</strong>
+                {sys.desc_user ? ` — ${sys.desc_user}` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "space-between" }}>
+          <button type="button" onClick={onDone} style={{ fontFamily: MONO, fontSize: 10, background: "none", border: "none", color: T.muted }}>
+            POMIŃ
+          </button>
+          <button
+            type="button"
+            onClick={() => (step >= steps.length - 1 ? onDone() : setStep(step + 1))}
+            style={{ fontFamily: MONO, fontSize: 11, background: T.red, color: "#fff", border: "none", padding: "8px 14px" }}
+          >
+            {step >= steps.length - 1 ? "ROZUMIEM" : "DALEJ"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PromptEngine() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>("konsola");
@@ -291,6 +364,7 @@ export default function PromptEngine() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editPrompt, setEditPrompt] = useState("");
   const [loadErr, setLoadErr] = useState("");
+  const [showOnboard, setShowOnboard] = useState(false);
 
   const current = systems.find((s) => s.slug === systemSlug);
   const isR1 = systemSlug === "r1";
@@ -314,6 +388,7 @@ export default function PromptEngine() {
         setIsAdmin(me.user.isAdmin);
         setReferralCode(me.user.referralCode || "");
         setReferredCount(me.referredCount || 0);
+        if (!me.user.onboardingCompletedAt) setShowOnboard(true);
         setCredits(me.credits);
         const savedRef = typeof window !== "undefined" ? localStorage.getItem("brns_ref") : null;
         if (savedRef) {
@@ -435,6 +510,15 @@ export default function PromptEngine() {
     setEditPrompt("");
   }
 
+  async function finishOnboarding() {
+    setShowOnboard(false);
+    try {
+      await authFetch("/api/me/onboarding", { method: "POST" });
+    } catch {
+      /* kolumna SQL jeszcze nie ma — overlay i tak znika w tej sesji */
+    }
+  }
+
   async function openEdit(id: string) {
     const json = await authFetch(`/api/admin/systems/${id}`);
     setEditId(id);
@@ -458,6 +542,7 @@ export default function PromptEngine() {
 
   return (
     <div style={{ background: T.bg, color: T.text, fontFamily: MONO, minHeight: "100vh" }}>
+      {showOnboard && <OnboardingGuide systems={systems} onDone={finishOnboarding} />}
       <div
         style={{
           display: "flex",

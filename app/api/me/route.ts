@@ -23,9 +23,16 @@ export async function GET(req: NextRequest) {
 
   let profileRes = await supabaseAdmin
     .from("profiles")
-    .select("email, is_admin, is_banned, consent_at, referred_by, referral_code")
+    .select("email, is_admin, is_banned, consent_at, referred_by, referral_code, onboarding_completed_at")
     .eq("id", user.id)
     .single();
+  if (profileRes.error) {
+    profileRes = await supabaseAdmin
+      .from("profiles")
+      .select("email, is_admin, is_banned, consent_at, referred_by, referral_code")
+      .eq("id", user.id)
+      .single();
+  }
   if (profileRes.error && /referr/i.test(profileRes.error.message)) {
     profileRes = await supabaseAdmin
       .from("profiles")
@@ -40,6 +47,7 @@ export async function GET(req: NextRequest) {
     consent_at?: string | null;
     referred_by?: string | null;
     referral_code?: string | null;
+    onboarding_completed_at?: string | null;
   } | null;
 
   let bootstrapFirstAdmin = false;
@@ -129,6 +137,7 @@ export async function GET(req: NextRequest) {
       consentAt: profilePatch.consent_at ?? profile?.consent_at ?? null,
       referralCode: profile?.referral_code ?? null,
       referredBy: profile?.referred_by ?? null,
+      onboardingCompletedAt: profile?.onboarding_completed_at ?? null,
     },
     referredCount,
     credits: credits?.balance ?? 0,
