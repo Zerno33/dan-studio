@@ -63,6 +63,69 @@ const ERROR_TAGS = [
   "tło / kadr",
 ];
 
+function uniqueImageFiles(files: File[]) {
+  const seen = new Set<string>();
+  const out: File[] = [];
+  for (const f of files) {
+    if (!f.type.startsWith("image/")) continue;
+    const key = `${f.name}:${f.size}:${f.type}:${f.lastModified}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(f);
+  }
+  return out;
+}
+
+function pasteTargetIsField(target: EventTarget | null) {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return true;
+  return Boolean(el.closest?.("textarea, input, [contenteditable='true']"));
+}
+
+function StudioModal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.72)",
+        zIndex: 80,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          background: T.panel,
+          border: `1px solid ${T.line2}`,
+          padding: 16,
+          fontFamily: MONO,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red, marginBottom: 12 }}>{title}</div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 async function authFetch(path: string, init: RequestInit = {}) {
   const supabase = await getSupabaseBrowser();
   const { data } = await supabase.auth.getSession();
@@ -172,6 +235,8 @@ export default function PromptEngine() {
   const [systemSlug, setSystemSlug] = useState<"n1" | "s1" | "r1">("n1");
   const [mode, setMode] = useState<"img" | "prompt">("img");
   const [images, setImages] = useState<{ id: string; base64: string; mime: string }[]>([]);
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
   const [pastedPrompt, setPastedPrompt] = useState("");
   const [brief, setBrief] = useState("");
   const [variant, setVariant] = useState("standard");
@@ -231,38 +296,34 @@ export default function PromptEngine() {
   useEffect(() => {
     const onPaste = async (e: ClipboardEvent) => {
       if (!showDrop) return;
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      const files: File[] = [];
-      for (const it of Array.from(items)) {
-        if (it.kind === "file" && it.type.startsWith("image/")) {
-          const f = it.getAsFile();
-          if (f) files.push(f);
-        }
-      }
-      if (e.clipboardData?.files?.length) {
-        for (const f of Array.from(e.clipboardData.files)) {
-          if (f.type.startsWith("image/")) files.push(f);
-        }
-      }
+      if (pasteTargetIsField(e.target)) return;
+      const files = uniqueImageFiles([
+        ...Array.from(e.clipboardData?.files || []),
+        ...Array.from(e.clipboardData?.items || [])
+          .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+          .map((it) => it.getAsFile())
+          .filter((f): f is File => Boolean(f)),
+      ]);
       if (!files.length) return;
       e.preventDefault();
       await addFiles(files);
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [showDrop, images, systemSlug]);
+  }, [showDrop, systemSlug, isR1, maxImgs]);
 
   async function addFiles(fileList: File[] | FileList) {
-    const arr = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
-    const next = [...images];
+    const arr = uniqueImageFiles(Array.from(fileList));
+    const next = [...imagesRef.current];
     for (const file of arr) {
       if (next.length >= maxImgs) break;
       if (isR1 || systemSlug === "s1") {
         next.splice(0, next.length, await fileToImage(file));
       } else next.push(await fileToImage(file));
     }
-    setImages(next.slice(0, maxImgs));
+    const sliced = next.slice(0, maxImgs);
+    imagesRef.current = sliced;
+    setImages(sliced);
   }
 
   async function generate() {
@@ -296,7 +357,12 @@ export default function PromptEngine() {
 
   async function loadLibrary() {
     const json = await authFetch("/api/prompts");
-    setLibrary(json.prompts || []);
+    const rows: any[] = json.prompts || [];
+    const byId = new Map<string, any>();
+    for (const p of rows) {
+      if (p?.id && !byId.has(p.id)) byId.set(p.id, p);
+    }
+    setLibrary(byId.size ? [...byId.values()] : rows);
   }
 
   async function loadAdminShell() {
@@ -662,6 +728,7 @@ export default function PromptEngine() {
                   formatMode={formatMode}
                   folders={folders}
                   onFolders={setFolders}
+                  onAssigned={loadLibrary}
                 />
               ))}
               {!blocks.length && !busy && (
@@ -828,14 +895,20 @@ function ResultCard({
   formatMode,
   folders,
   onFolders,
+  onAssigned,
 }: {
   index: number;
   block: { id?: string; prompt: string; negative: string };
   formatMode: "together" | "separate";
   folders: { id: string; name: string }[];
   onFolders: (f: { id: string; name: string }[]) => void;
+  onAssigned: () => Promise<void>;
 }) {
   const [openRate, setOpenRate] = useState(false);
+  const [folderModal, setFolderModal] = useState(false);
+  const [folderName, setFolderName] = useState("");
+  const [folderBusy, setFolderBusy] = useState(false);
+  const assigning = useRef(false);
   const words = block.prompt.trim().split(/\s+/).filter(Boolean).length;
   const full = block.negative ? `${block.prompt}\n\nNegative prompt: ${block.negative}` : block.prompt;
   const ghostBtn: CSSProperties = {
@@ -848,8 +921,75 @@ function ResultCard({
     border: `1px solid ${T.line2}`,
   };
 
+  async function assignFolder(folderId: string) {
+    if (!block.id || assigning.current) return;
+    assigning.current = true;
+    setFolderBusy(true);
+    try {
+      await authFetch(`/api/prompts/${block.id}`, { method: "PATCH", body: JSON.stringify({ folderId }) });
+      await onAssigned();
+    } finally {
+      assigning.current = false;
+      setFolderBusy(false);
+    }
+  }
+
+  async function createAndAssign() {
+    const name = folderName.trim();
+    if (!name || !block.id || assigning.current) return;
+    assigning.current = true;
+    setFolderBusy(true);
+    try {
+      const json = await authFetch("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
+      onFolders([json.folder, ...folders.filter((f) => f.id !== json.folder.id)]);
+      await authFetch(`/api/prompts/${block.id}`, { method: "PATCH", body: JSON.stringify({ folderId: json.folder.id }) });
+      await onAssigned();
+      setFolderModal(false);
+      setFolderName("");
+    } finally {
+      assigning.current = false;
+      setFolderBusy(false);
+    }
+  }
+
   return (
     <div style={{ marginBottom: 16, border: `1px solid ${T.line}`, background: T.panel }}>
+      {folderModal && (
+        <StudioModal title="NOWY FOLDER" onClose={() => !folderBusy && setFolderModal(false)}>
+          <input
+            autoFocus
+            value={folderName}
+            onChange={(e) => setFolderName(e.target.value)}
+            placeholder="Nazwa folderu"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void createAndAssign();
+            }}
+            style={{
+              width: "100%",
+              fontFamily: MONO,
+              fontSize: 13,
+              background: T.bg,
+              color: T.text,
+              border: `1px solid ${T.line2}`,
+              padding: 10,
+              marginBottom: 12,
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button type="button" style={ghostBtn} disabled={folderBusy} onClick={() => setFolderModal(false)}>
+              ANULUJ
+            </button>
+            <button
+              type="button"
+              disabled={folderBusy || !folderName.trim()}
+              onClick={() => void createAndAssign()}
+              style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
+            >
+              ZAPISZ
+            </button>
+          </div>
+        </StudioModal>
+      )}
       <div
         style={{
           display: "flex",
@@ -870,16 +1010,12 @@ function ResultCard({
             onChange={async (e) => {
               const val = e.target.value;
               e.target.value = "";
-              if (!val || !block.id) return;
+              if (!val || !block.id || folderBusy) return;
               if (val === "__new") {
-                const name = prompt("Nazwa folderu");
-                if (!name) return;
-                const json = await authFetch("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
-                onFolders([json.folder, ...folders]);
-                await authFetch(`/api/prompts/${block.id}`, { method: "PATCH", body: JSON.stringify({ folderId: json.folder.id }) });
+                setFolderModal(true);
                 return;
               }
-              await authFetch(`/api/prompts/${block.id}`, { method: "PATCH", body: JSON.stringify({ folderId: val }) });
+              await assignFolder(val);
             }}
           >
             <option value="">+ Dodaj do folderu</option>
