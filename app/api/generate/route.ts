@@ -46,6 +46,7 @@ interface GenerateRequest {
   lengthMode?: "short" | "std" | "long";
   modelOverride?: string;
   formatMode?: "together" | "separate"; // MYS-45: było tylko na froncie
+  sourcePreviews?: (string | null)[];
 }
 
 interface PromptBlock {
@@ -305,21 +306,32 @@ export async function POST(req: NextRequest) {
   });
 
   // 7b. MYS-45: zapis wygenerowanych bloków do biblioteki
-  const { data: savedPrompts } = await supabaseAdmin
-    .from("prompts")
-    .insert(
-      blocks.map((b) => ({
-        user_id: userId,
-        system_id: system.id,
-        system_version: system.version,
-        prompt: b.prompt,
-        negative: b.negative,
-        format_mode: body.formatMode ?? "together",
-        word_count: b.prompt.trim().split(/\s+/).length,
-        folder_id: null,
-      }))
-    )
-    .select("id");
+  const previews = body.sourcePreviews ?? [];
+  const rows = blocks.map((b, i) => ({
+    user_id: userId,
+    system_id: system.id,
+    system_version: system.version,
+    prompt: b.prompt,
+    negative: b.negative,
+    format_mode: body.formatMode ?? "together",
+    word_count: b.prompt.trim().split(/\s+/).length,
+    folder_id: null,
+    source_preview: previews[i] || previews[0] || null,
+  }));
+
+  let savedPrompts: { id: string }[] | null = null;
+  const withPreview = await supabaseAdmin.from("prompts").insert(rows).select("id");
+  if (withPreview.error) {
+    const fallbackRows = rows.map(({ source_preview: _p, ...rest }) => rest);
+    const withoutPreview = await supabaseAdmin.from("prompts").insert(fallbackRows).select("id");
+    if (withoutPreview.error) {
+      console.error("prompts insert:", withoutPreview.error.message);
+    } else {
+      savedPrompts = withoutPreview.data;
+    }
+  } else {
+    savedPrompts = withPreview.data;
+  }
 
   return NextResponse.json({
     blocks: blocks.map((b, i) => ({ ...b, id: savedPrompts?.[i]?.id ?? null })),

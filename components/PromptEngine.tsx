@@ -67,13 +67,22 @@ function uniqueImageFiles(files: File[]) {
   const seen = new Set<string>();
   const out: File[] = [];
   for (const f of files) {
-    if (!f.type.startsWith("image/")) continue;
-    const key = `${f.name}:${f.size}:${f.type}:${f.lastModified}`;
+    if (f.type && !f.type.startsWith("image/")) continue;
+    const key = `${f.size}:${f.type || "image"}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(f);
   }
   return out;
+}
+
+function filesForOnePaste(files: File[]) {
+  const unique = uniqueImageFiles(files);
+  const bySize = new Map<number, File>();
+  for (const f of unique) {
+    if (!bySize.has(f.size)) bySize.set(f.size, f);
+  }
+  return [...bySize.values()];
 }
 
 function pasteTargetIsField(target: EventTarget | null) {
@@ -153,6 +162,28 @@ function fileToImage(file: File): Promise<{ id: string; base64: string; mime: st
       resolve({ id: Math.random().toString(36).slice(2, 10), base64, mime: file.type || "image/jpeg" });
     };
     reader.readAsDataURL(file);
+  });
+}
+
+function imageToPreview(base64: string, mime: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 200;
+      const scale = Math.min(1, max / Math.max(img.width, img.height, 1));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.72));
+    };
+    img.onerror = () => resolve(null);
+    img.src = `data:${mime};base64,${base64}`;
   });
 }
 
@@ -237,6 +268,7 @@ export default function PromptEngine() {
   const [images, setImages] = useState<{ id: string; base64: string; mime: string }[]>([]);
   const imagesRef = useRef(images);
   imagesRef.current = images;
+  const pasteLockAt = useRef(0);
   const [pastedPrompt, setPastedPrompt] = useState("");
   const [brief, setBrief] = useState("");
   const [variant, setVariant] = useState("standard");
@@ -297,7 +329,13 @@ export default function PromptEngine() {
     const onPaste = async (e: ClipboardEvent) => {
       if (!showDrop) return;
       if (pasteTargetIsField(e.target)) return;
-      const files = uniqueImageFiles([
+      const now = Date.now();
+      if (now - pasteLockAt.current < 400) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      const files = filesForOnePaste([
         ...Array.from(e.clipboardData?.files || []),
         ...Array.from(e.clipboardData?.items || [])
           .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
@@ -305,11 +343,13 @@ export default function PromptEngine() {
           .filter((f): f is File => Boolean(f)),
       ]);
       if (!files.length) return;
+      pasteLockAt.current = now;
       e.preventDefault();
+      e.stopImmediatePropagation();
       await addFiles(files);
     };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
+    window.addEventListener("paste", onPaste, true);
+    return () => window.removeEventListener("paste", onPaste, true);
   }, [showDrop, systemSlug, isR1, maxImgs]);
 
   async function addFiles(fileList: File[] | FileList) {
@@ -331,12 +371,14 @@ export default function PromptEngine() {
     setError("");
     try {
       if (!systems.length) throw new Error("Brak systemów. Seed N1/S1/R1 w bazie.");
+      const sourcePreviews = await Promise.all(images.map((img) => imageToPreview(img.base64, img.mime)));
       const json = await authFetch("/api/generate", {
         method: "POST",
         body: JSON.stringify({
           systemSlug,
           mode: systemSlug === "n1" ? mode : undefined,
           images: images.map(({ base64, mime }) => ({ base64, mime })),
+          sourcePreviews,
           pastedPrompt,
           brief,
           variant: isR1 ? variant : undefined,
@@ -766,14 +808,59 @@ export default function PromptEngine() {
                 </Chip>
               ))}
             </div>
-            {libFiltered.map((p) => (
-              <article key={p.id} style={{ border: `1px solid ${T.line}`, background: T.panel, marginBottom: 12, padding: 12 }}>
-                <div style={{ fontSize: 10, color: T.muted }}>
-                  {p.created_at} · {p.word_count} słów
-                </div>
-                <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: "8px 0 0" }}>{p.prompt}</pre>
-              </article>
-            ))}
+            {libFiltered.map((p) => {
+              const copyText =
+                p.format_mode === "together" && p.negative
+                  ? `${p.prompt}\n\nNegative prompt: ${p.negative}`
+                  : p.prompt;
+              return (
+                <article
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "flex-start",
+                    border: `1px solid ${T.line}`,
+                    background: T.panel,
+                    marginBottom: 12,
+                    padding: 12,
+                  }}
+                >
+                  {p.source_preview ? (
+                    <img
+                      src={p.source_preview}
+                      alt=""
+                      style={{ width: 72, height: 94, objectFit: "cover", border: `1px solid ${T.line2}`, flexShrink: 0 }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 72,
+                        height: 94,
+                        flexShrink: 0,
+                        border: `1px dashed ${T.line2}`,
+                        background: T.panel2,
+                      }}
+                    />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ fontSize: 10, color: T.muted }}>
+                        {p.created_at} · {p.word_count} słów
+                      </div>
+                      <button
+                        type="button"
+                        style={ghostBtn}
+                        onClick={() => navigator.clipboard.writeText(copyText)}
+                      >
+                        KOPIUJ
+                      </button>
+                    </div>
+                    <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: "8px 0 0" }}>{p.prompt}</pre>
+                  </div>
+                </article>
+              );
+            })}
             {!libFiltered.length && <p style={{ color: T.muted, fontSize: 11 }}>Brak promptów.</p>}
           </div>
         )}
