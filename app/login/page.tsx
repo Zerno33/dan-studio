@@ -21,10 +21,21 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
+  const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("ref");
     if (q?.trim()) localStorage.setItem("brns_ref", q.trim().toLowerCase());
+
+    let unsub: { unsubscribe: () => void } | undefined;
+    (async () => {
+      const supabase = await getSupabaseBrowser();
+      const { data } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "PASSWORD_RECOVERY") setRecovery(true);
+      });
+      unsub = data.subscription;
+    })();
+    return () => unsub?.unsubscribe();
   }, []);
 
   async function signIn(mode: "in" | "up") {
@@ -79,6 +90,54 @@ export default function LoginPage() {
     }
   }
 
+  async function sendReset() {
+    setBusy(true);
+    setError("");
+    setInfo("");
+    try {
+      if (!email.trim()) throw new Error("Wpisz email, potem kliknij reset.");
+      const supabase = await getSupabaseBrowser();
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/login`,
+      });
+      if (err) throw err;
+      setInfo("Jeśli konto istnieje — mail z linkiem (sprawdź spam).");
+    } catch (e: any) {
+      setError(polishAuthError(e.message || "Nie wysłano resetu."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveNewPassword() {
+    setBusy(true);
+    setError("");
+    try {
+      if (!password || password.length < 6) throw new Error("Hasło min. 6 znaków.");
+      const supabase = await getSupabaseBrowser();
+      const { error: err } = await supabase.auth.updateUser({ password });
+      if (err) throw err;
+      window.location.href = "/";
+    } catch (e: any) {
+      setError(polishAuthError(e.message || "Nie zapisano hasła."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (recovery) {
+    return (
+      <main style={{ maxWidth: 420, margin: "80px auto", padding: 24 }}>
+        <h1 style={{ color: "#E5152A" }}>NOWE HASŁO</h1>
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nowe hasło" style={field} />
+        {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
+        <button disabled={busy} onClick={saveNewPassword} style={btn}>
+          Zapisz
+        </button>
+      </main>
+    );
+  }
+
   return (
     <main style={{ maxWidth: 420, margin: "80px auto", padding: 24 }}>
       <h1 style={{ color: "#E5152A" }}>PROMPT_ENGINE</h1>
@@ -103,6 +162,9 @@ export default function LoginPage() {
           Google
         </button>
       </div>
+      <button type="button" disabled={busy} onClick={sendReset} style={{ ...btn, background: "transparent", color: "#8A8A8A", marginTop: 12, padding: 0 }}>
+        Nie pamiętam hasła
+      </button>
     </main>
   );
 }

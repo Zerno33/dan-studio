@@ -5,7 +5,7 @@ import { ALLOWED_MODELS } from "@/lib/models";
 import { calculateCreditCost } from "@/lib/credits";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
-type Tab = "konsola" | "biblioteka" | "nauczyciel" | "admin";
+type Tab = "konsola" | "pomoc" | "biblioteka" | "nauczyciel" | "admin";
 type PublicSystem = {
   id: string;
   slug: "n1" | "s1" | "r1";
@@ -372,6 +372,10 @@ export default function PromptEngine() {
   const [editPrompt, setEditPrompt] = useState("");
   const [loadErr, setLoadErr] = useState("");
   const [showOnboard, setShowOnboard] = useState(false);
+  const [ratingsSummary, setRatingsSummary] = useState<Record<string, { total: number; pass: number; tags: Record<string, number> }>>({});
+  const [libFolderOpen, setLibFolderOpen] = useState(false);
+  const [libFolderName, setLibFolderName] = useState("");
+  const [adminModal, setAdminModal] = useState<null | { kind: "credits" | "ref"; userId: string; email: string; value: string }>(null);
 
   const current = systems.find((s) => s.slug === systemSlug);
   const isR1 = systemSlug === "r1";
@@ -505,16 +509,18 @@ export default function PromptEngine() {
   }
 
   async function loadAdminShell() {
-    const [sys, users, cost, pay] = await Promise.all([
+    const [sys, users, cost, pay, ratings] = await Promise.all([
       authFetch("/api/admin/systems?meta=1"),
       authFetch("/api/admin/users"),
       authFetch("/api/admin/cost-summary"),
       authFetch("/api/admin/payouts").catch(() => ({ payouts: [] })),
+      authFetch("/api/admin/ratings-summary").catch(() => ({ summary: {} })),
     ]);
     setAdminSystems(sys.systems || []);
     setAdminUsers(users.users || []);
     setCostSummary(cost);
     setPayouts(pay.payouts || []);
+    setRatingsSummary(ratings.summary || {});
     setEditId(null);
     setEditPrompt("");
   }
@@ -558,6 +564,95 @@ export default function PromptEngine() {
   return (
     <div style={{ background: T.bg, color: T.text, fontFamily: MONO, minHeight: "100vh" }}>
       {showOnboard && <OnboardingGuide systems={systems} onDone={finishOnboarding} />}
+      {libFolderOpen && (
+        <StudioModal title="NOWY FOLDER" onClose={() => setLibFolderOpen(false)}>
+          <input
+            autoFocus
+            value={libFolderName}
+            onChange={(e) => setLibFolderName(e.target.value)}
+            placeholder="Nazwa"
+            style={{
+              width: "100%",
+              fontFamily: MONO,
+              fontSize: 13,
+              background: T.bg,
+              color: T.text,
+              border: `1px solid ${T.line2}`,
+              padding: 10,
+              marginBottom: 12,
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button type="button" style={ghostBtn} onClick={() => setLibFolderOpen(false)}>
+              ANULUJ
+            </button>
+            <button
+              type="button"
+              style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
+              onClick={async () => {
+                const name = libFolderName.trim();
+                if (!name) return;
+                const json = await authFetch("/api/folders", { method: "POST", body: JSON.stringify({ name }) });
+                setFolders((f) => [json.folder, ...f.filter((x) => x.id !== json.folder.id)]);
+                setLibFolderName("");
+                setLibFolderOpen(false);
+                setActiveFolder(json.folder.id);
+              }}
+            >
+              ZAPISZ
+            </button>
+          </div>
+        </StudioModal>
+      )}
+      {adminModal && (
+        <StudioModal title={adminModal.kind === "credits" ? "KREDYTY" : "KOD REF"} onClose={() => setAdminModal(null)}>
+          <div style={{ fontSize: 11, color: T.muted, marginBottom: 8 }}>{adminModal.email}</div>
+          <input
+            autoFocus
+            value={adminModal.value}
+            onChange={(e) => setAdminModal({ ...adminModal, value: e.target.value })}
+            placeholder={adminModal.kind === "credits" ? "50" : "ania"}
+            style={{
+              width: "100%",
+              fontFamily: MONO,
+              fontSize: 13,
+              background: T.bg,
+              color: T.text,
+              border: `1px solid ${T.line2}`,
+              padding: 10,
+              marginBottom: 12,
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button type="button" style={ghostBtn} onClick={() => setAdminModal(null)}>
+              ANULUJ
+            </button>
+            <button
+              type="button"
+              style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
+              onClick={async () => {
+                if (adminModal.kind === "credits") {
+                  const amount = Number(adminModal.value);
+                  if (!Number.isFinite(amount)) return;
+                  await authFetch(`/api/admin/users/${adminModal.userId}/credits`, {
+                    method: "POST",
+                    body: JSON.stringify({ amount }),
+                  });
+                } else {
+                  await authFetch(`/api/admin/users/${adminModal.userId}/referral`, {
+                    method: "POST",
+                    body: JSON.stringify({ code: adminModal.value }),
+                  });
+                }
+                setAdminModal(null);
+                await loadAdminShell();
+              }}
+            >
+              ZAPISZ
+            </button>
+          </div>
+        </StudioModal>
+      )}
       <div
         style={{
           display: "flex",
@@ -582,7 +677,7 @@ export default function PromptEngine() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {(
-            ["konsola", "biblioteka", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
+            ["konsola", "pomoc", "biblioteka", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
           ).map((t) => (
             <Chip
               key={t}
@@ -911,6 +1006,26 @@ export default function PromptEngine() {
           </>
         )}
 
+        {tab === "pomoc" && (
+          <div>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.red }}>JAK TO DZIAŁA</h2>
+            <p style={{ color: T.muted, fontSize: 13, lineHeight: 1.7, maxWidth: 640 }}>
+              Wynik to prompt tekstowy do kopiowania, nie wygenerowany obraz. Brief to opcjonalna notatka dla modelu.
+            </p>
+            {systems.map((s) => (
+              <article key={s.slug} style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 14, marginTop: 12 }}>
+                <div style={{ fontSize: 13, color: T.text }}>
+                  {s.icon} {s.label}
+                </div>
+                <p style={{ fontSize: 12, color: T.muted, lineHeight: 1.7, margin: "8px 0 0" }}>{s.desc_user || "—"}</p>
+                {s.inputs_desc && (
+                  <p style={{ fontSize: 11, color: T.muted, margin: "6px 0 0" }}>Wejście: {s.inputs_desc}</p>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+
         {tab === "biblioteka" && (
           <div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
@@ -925,6 +1040,9 @@ export default function PromptEngine() {
                   {f.name}
                 </Chip>
               ))}
+              <Chip active={false} onClick={() => setLibFolderOpen(true)}>
+                + FOLDER
+              </Chip>
             </div>
             {libFiltered.map((p) => {
               const copyText =
@@ -974,6 +1092,34 @@ export default function PromptEngine() {
                         KOPIUJ
                       </button>
                     </div>
+                    <select
+                      value={p.folder_id || ""}
+                      onChange={async (e) => {
+                        const folderId = e.target.value || null;
+                        await authFetch(`/api/prompts/${p.id}`, {
+                          method: "PATCH",
+                          body: JSON.stringify({ folderId }),
+                        });
+                        await loadLibrary();
+                      }}
+                      style={{
+                        fontFamily: MONO,
+                        fontSize: 10,
+                        background: T.bg,
+                        color: T.text,
+                        border: `1px solid ${T.line2}`,
+                        marginTop: 8,
+                        padding: "3px 6px",
+                        colorScheme: "dark",
+                      }}
+                    >
+                      <option value="">Bez folderu</option>
+                      {folders.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
                     <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: "8px 0 0" }}>{p.prompt}</pre>
                   </div>
                 </article>
@@ -1090,30 +1236,14 @@ export default function PromptEngine() {
                 <button
                   type="button"
                   style={ghostBtn}
-                  onClick={async () => {
-                    const code = window.prompt("Kod nauczyciela (puste = wyłącz)", u.referral_code || "");
-                    if (code === null) return;
-                    await authFetch(`/api/admin/users/${u.id}/referral`, {
-                      method: "POST",
-                      body: JSON.stringify({ code }),
-                    });
-                    await loadAdminShell();
-                  }}
+                  onClick={() => setAdminModal({ kind: "ref", userId: u.id, email: u.email, value: u.referral_code || "" })}
                 >
                   KOD REF
                 </button>
                 <button
                   type="button"
                   style={ghostBtn}
-                  onClick={async () => {
-                    const amount = Number(prompt("Ile kredytów dodać?", "50"));
-                    if (!Number.isFinite(amount)) return;
-                    await authFetch(`/api/admin/users/${u.id}/credits`, {
-                      method: "POST",
-                      body: JSON.stringify({ amount }),
-                    });
-                    await loadAdminShell();
-                  }}
+                  onClick={() => setAdminModal({ kind: "credits", userId: u.id, email: u.email, value: "50" })}
                 >
                   KREDYTY
                 </button>
@@ -1134,9 +1264,31 @@ export default function PromptEngine() {
             ))}
 
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>KOSZT</h2>
-            <pre style={{ fontSize: 11, color: T.muted, background: T.panel, padding: 12, border: `1px solid ${T.line}` }}>
-              {JSON.stringify(costSummary?.summary ?? {}, null, 2)}
-            </pre>
+            <div style={{ fontSize: 12, color: T.muted, marginBottom: 8 }}>
+              USD {costSummary?.summary?.totalCostUsd ?? "—"} · kredyty {costSummary?.summary?.totalCreditsSpent ?? "—"}
+              {costSummary?.summary?.marginWarning ? " · UWAGA marża" : ""}
+            </div>
+            {(costSummary?.daily || []).slice(0, 14).map((d: { day: string; cost_usd?: number; credits_spent?: number }) => (
+              <div key={d.day} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "4px 0", borderBottom: `1px solid ${T.line}` }}>
+                <span>{d.day}</span>
+                <span>
+                  {d.cost_usd ?? 0} USD / {d.credits_spent ?? 0} kr
+                </span>
+              </div>
+            ))}
+
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>OCENY</h2>
+            {Object.entries(ratingsSummary).map(([k, v]) => (
+              <div key={k} style={{ border: `1px solid ${T.line}`, padding: 10, marginBottom: 8, fontSize: 12 }}>
+                <b>{k}</b> · {v.pass}/{v.total} PASS
+                <div style={{ color: T.muted, fontSize: 11, marginTop: 4 }}>
+                  {Object.entries(v.tags)
+                    .map(([t, n]) => `${t} ${n}`)
+                    .join(" · ") || "brak tagów FAIL"}
+                </div>
+              </div>
+            ))}
+            {!Object.keys(ratingsSummary).length && <p style={{ color: T.muted, fontSize: 11 }}>Brak ocen.</p>}
 
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>SYSTEMY</h2>
             {adminSystems.map((s) => (
