@@ -275,13 +275,36 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("Generate error:", e instanceof Error ? e.message : "unknown");
     await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
+    await supabaseAdmin.from("credit_transactions").insert({
+      user_id: userId,
+      delta: 0,
+      reason: "generation_failed",
+      system_id: system.id,
+      model: modelToUse,
+    });
     return NextResponse.json({ error: userFacingLlmError(e) }, { status: 502 });
   }
 
   const blocks = parseBlocks(raw);
   if (!blocks.length) {
     await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
-    return NextResponse.json({ error: "Pusty output. Powtórz." }, { status: 502 });
+    await supabaseAdmin.from("credit_transactions").insert({
+      user_id: userId,
+      delta: 0,
+      reason: "generation_failed",
+      system_id: system.id,
+      model: modelToUse,
+    });
+    const grokVision =
+      String(modelToUse).startsWith("grok-") && (body.images?.length ?? 0) > 0;
+    return NextResponse.json(
+      {
+        error: grokVision
+          ? "Grok zwrócił pusty output przy zdjęciu. Na N1 ze zdjęciem wybierz GPT (Luna/Terra)."
+          : "Pusty output. Powtórz.",
+      },
+      { status: 502 }
+    );
   }
 
   // 7a. MYS-39: policz koszt USD i zapisz transakcję z detalami tokenów

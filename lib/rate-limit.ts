@@ -2,8 +2,8 @@
 // lib/rate-limit.ts — MYS-40
 // Rate limiting per user na /api/generate + walidacja rozmiaru
 // obrazów. Bez zewnętrznego serwisu (Upstash/Redis) na razie —
-// licznik oparty o credit_transactions.created_at, które już
-// logujemy przy każdej generacji. Jeśli ruch wzrośnie na tyle,
+// licznik oparty o credit_transactions.created_at (generation
+// i generation_failed). Jeśli ruch wzrośnie na tyle,
 // że zapytanie liczące stanie się kosztowne, przejść na Redis.
 // ============================================================
 
@@ -30,13 +30,13 @@ export async function checkRateLimit(
       .from("credit_transactions")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
-      .eq("reason", "generation")
+      .in("reason", ["generation", "generation_failed"])
       .gte("created_at", oneMinuteAgo),
     supabase
       .from("credit_transactions")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
-      .eq("reason", "generation")
+      .in("reason", ["generation", "generation_failed"])
       .gte("created_at", oneHourAgo),
   ]);
 

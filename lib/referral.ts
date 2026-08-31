@@ -5,6 +5,26 @@ export function normalizeReferralCode(raw: string): string | null {
   return v;
 }
 
+export async function findTeacherByCode(
+  supabaseAdmin: { from: (table: string) => any },
+  code: string
+): Promise<{ id: string } | null> {
+  const normalized = normalizeReferralCode(code);
+  if (!normalized) return null;
+  const exact = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("referral_code", normalized)
+    .maybeSingle();
+  if (exact.data?.id) return exact.data;
+  const loose = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .ilike("referral_code", normalized)
+    .maybeSingle();
+  return loose.data?.id ? loose.data : null;
+}
+
 export async function linkReferralRow(
   supabaseAdmin: { from: (table: string) => { upsert: Function } },
   teacherId: string,

@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const supabaseAdmin = getSupabaseAdmin();
-  const [dailyRes, byUserRes] = await Promise.all([
+  const [dailyRes, byUserRes, txRes] = await Promise.all([
     supabaseAdmin
       .from("admin_cost_daily")
       .select("*")
@@ -26,10 +26,38 @@ export async function GET(req: NextRequest) {
       .select("*")
       .order("total_cost_usd", { ascending: false })
       .limit(10),
+    supabaseAdmin
+      .from("credit_transactions")
+      .select("model, cost_usd, delta, reason, created_at")
+      .gte("created_at", since)
+      .in("reason", ["generation", "generation_failed"]),
   ]);
 
   if (dailyRes.error) return NextResponse.json({ error: dailyRes.error.message }, { status: 500 });
   if (byUserRes.error) return NextResponse.json({ error: byUserRes.error.message }, { status: 500 });
+
+  const byModelMap = new Map<
+    string,
+    { model: string; generations: number; failed: number; creditsSpent: number; costUsd: number }
+  >();
+  for (const row of txRes.data ?? []) {
+    const model = row.model || "(brak)";
+    const cur = byModelMap.get(model) || {
+      model,
+      generations: 0,
+      failed: 0,
+      creditsSpent: 0,
+      costUsd: 0,
+    };
+    if (row.reason === "generation_failed") cur.failed += 1;
+    else {
+      cur.generations += 1;
+      cur.creditsSpent += Math.abs(Number(row.delta) || 0);
+      cur.costUsd += Number(row.cost_usd) || 0;
+    }
+    byModelMap.set(model, cur);
+  }
+  const byModel = [...byModelMap.values()].sort((a, b) => b.costUsd - a.costUsd);
 
   const totalCostUsd = (dailyRes.data ?? []).reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
   const totalCreditsSpent = (dailyRes.data ?? []).reduce((sum, r) => sum + (r.credits_spent ?? 0), 0);
@@ -42,6 +70,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     daily: dailyRes.data,
     topUsersByCost: byUserRes.data,
+    byModel,
     summary: {
       totalCostUsd: Number(totalCostUsd.toFixed(2)),
       totalCreditsSpent,

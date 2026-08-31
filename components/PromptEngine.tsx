@@ -404,6 +404,8 @@ export default function PromptEngine() {
         setReferredCount(me.referredCount || 0);
         if (!me.user.onboardingCompletedAt) setShowOnboard(true);
         setCredits(me.credits);
+        const urlRef = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("ref") : null;
+        if (urlRef?.trim()) localStorage.setItem("brns_ref", urlRef.trim().toLowerCase());
         const savedRef = typeof window !== "undefined" ? localStorage.getItem("brns_ref") : null;
         if (savedRef) {
           try {
@@ -1347,6 +1349,23 @@ export default function PromptEngine() {
                 </span>
               </div>
             ))}
+            <h3 style={{ fontSize: 11, letterSpacing: "0.1em", color: T.muted, marginTop: 16 }}>GROK VS GPT</h3>
+            {(costSummary?.byModel || []).map(
+              (m: { model: string; generations: number; failed: number; creditsSpent: number; costUsd: number }) => (
+                <div
+                  key={m.model}
+                  style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "4px 0", borderBottom: `1px solid ${T.line}` }}
+                >
+                  <span>{m.model}</span>
+                  <span>
+                    {m.generations} gen · {m.failed} fail · {m.creditsSpent} kr · {Number(m.costUsd).toFixed(4)} USD
+                  </span>
+                </div>
+              )
+            )}
+            {!(costSummary?.byModel || []).length && (
+              <p style={{ color: T.muted, fontSize: 11 }}>Brak generacji z modelem w tym okresie.</p>
+            )}
 
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>OCENY</h2>
             {Object.entries(ratingsSummary).map(([k, v]) => (

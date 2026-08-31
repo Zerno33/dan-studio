@@ -91,6 +91,7 @@ Wdrożone i zweryfikowane na żywej bazie (2026-08-20):
 | `mys39_cost_tracking_columns` | tokeny + `cost_usd` w `credit_transactions` |
 | `mys39_cost_views` | `admin_cost_daily`, `admin_cost_by_user` |
 | `mys38_credit_pricing` | `credits_per_block`: R1=1, S1=2, N1=2 |
+| `mor_grant_credits` | `grant_credits` + unikalne `external_event_id` |
 
 ---
 

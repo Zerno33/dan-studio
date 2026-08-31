@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
-import { normalizeReferralCode, linkReferralRow } from "@/lib/referral";
+import { normalizeReferralCode, linkReferralRow, findTeacherByCode } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nie możesz polecić sam siebie." }, { status: 400 });
   }
 
-  const { data: teacher } = await supabaseAdmin
-    .from("profiles")
-    .select("id")
-    .eq("referral_code", code)
-    .maybeSingle();
-
+  const teacher = await findTeacherByCode(supabaseAdmin, code);
   if (!teacher) return NextResponse.json({ error: "Nieznany kod nauczyciela." }, { status: 404 });
 
   const { error } = await supabaseAdmin.from("profiles").update({ referred_by: code }).eq("id", user.id);

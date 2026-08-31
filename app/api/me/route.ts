@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
-import { normalizeReferralCode, linkReferralRow } from "@/lib/referral";
+import { normalizeReferralCode, linkReferralRow, findTeacherByCode } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -108,14 +108,15 @@ export async function GET(req: NextRequest) {
 
   const metaCode = normalizeReferralCode(String((user.user_metadata as { referred_by?: string })?.referred_by || ""));
   if (profile && !profile.referred_by && metaCode && metaCode !== profile.referral_code) {
-    const { data: teacher } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("referral_code", metaCode)
-      .maybeSingle();
+    const teacher = await findTeacherByCode(supabaseAdmin, metaCode);
     if (teacher) {
       await supabaseAdmin.from("profiles").update({ referred_by: metaCode }).eq("id", user.id);
       profile.referred_by = metaCode;
+      await linkReferralRow(supabaseAdmin, teacher.id, user.id);
+    }
+  } else if (profile?.referred_by) {
+    const teacher = await findTeacherByCode(supabaseAdmin, profile.referred_by);
+    if (teacher && teacher.id !== user.id) {
       await linkReferralRow(supabaseAdmin, teacher.id, user.id);
     }
   }

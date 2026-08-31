@@ -80,9 +80,13 @@ export default function LoginPage() {
     }
     try {
       const supabase = await getSupabaseBrowser();
+      const ref = typeof window !== "undefined" ? localStorage.getItem("brns_ref") : null;
+      const dest = ref
+        ? `${window.location.origin}/?ref=${encodeURIComponent(ref)}`
+        : `${window.location.origin}/`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/` },
+        options: { redirectTo: dest },
       });
       if (error) setError(polishAuthError(error.message));
     } catch (e: any) {

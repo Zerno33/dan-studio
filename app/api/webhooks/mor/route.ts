@@ -3,12 +3,26 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
-function grantAmountFromEvent(payload: any): { userId?: string; email?: string; amount: number } | null {
-  const amount = Number(
-    payload?.data?.credits ??
-      payload?.meta?.custom_data?.credits ??
-      payload?.data?.attributes?.first_order_item?.product_id ??
-      0
+function firstPositiveInt(...candidates: unknown[]): number | null {
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  }
+  return null;
+}
+
+function grantFromEvent(payload: any): {
+  userId?: string;
+  email?: string;
+  amount: number;
+  eventId: string | null;
+} | null {
+  const amount = firstPositiveInt(
+    payload?.data?.credits,
+    payload?.meta?.custom_data?.credits,
+    payload?.data?.attributes?.custom_data?.credits,
+    payload?.data?.attributes?.first_order_item?.custom_data?.credits
   );
   const userId =
     payload?.data?.user_id ??
@@ -18,8 +32,24 @@ function grantAmountFromEvent(payload: any): { userId?: string; email?: string; 
     payload?.data?.email ??
     payload?.data?.attributes?.user_email ??
     payload?.data?.customer_email;
-  if (!userId && !email) return null;
-  return { userId, email, amount: Number.isFinite(amount) && amount > 0 ? amount : 100 };
+  if (amount == null || (!userId && !email)) return null;
+
+  const eventName = payload?.meta?.event_name ?? payload?.event_name;
+  const dataId = payload?.data?.id ?? payload?.meta?.event_id ?? payload?.id;
+  const orderKey =
+    payload?.data?.attributes?.identifier ??
+    payload?.data?.attributes?.order_number ??
+    payload?.data?.attributes?.created_at;
+  const eventId =
+    payload?.meta?.webhook_id != null
+      ? String(payload.meta.webhook_id)
+      : dataId != null
+        ? `${eventName ?? "event"}:${dataId}`
+        : orderKey != null
+          ? `order:${orderKey}:${amount}`
+          : null;
+
+  return { userId, email, amount, eventId };
 }
 
 export async function POST(req: NextRequest) {
@@ -34,7 +64,7 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = await req.json();
-  const grant = grantAmountFromEvent(payload);
+  const grant = grantFromEvent(payload);
   if (!grant) return NextResponse.json({ ok: true, skipped: true });
 
   const supabaseAdmin = getSupabaseAdmin();
@@ -49,19 +79,17 @@ export async function POST(req: NextRequest) {
   }
   if (!userId) return NextResponse.json({ ok: true, skipped: true });
 
-  const { data: current } = await supabaseAdmin
-    .from("credits")
-    .select("balance")
-    .eq("user_id", userId)
-    .single();
-
-  const newBalance = (current?.balance ?? 0) + grant.amount;
-  await supabaseAdmin.from("credits").upsert({ user_id: userId, balance: newBalance });
-  await supabaseAdmin.from("credit_transactions").insert({
-    user_id: userId,
-    delta: grant.amount,
-    reason: "mor_topup",
+  const { data: newBalance, error } = await supabaseAdmin.rpc("grant_credits", {
+    p_user: userId,
+    p_amount: grant.amount,
+    p_reason: "mor_topup",
+    p_event_id: grant.eventId,
   });
+
+  if (error) {
+    console.error("MoR grant_credits:", error.message);
+    return NextResponse.json({ error: "Nie udało się zapisać kredytów." }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, balance: newBalance });
 }
