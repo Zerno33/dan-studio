@@ -51,7 +51,12 @@ export default function LoginPage() {
         const { data, error: authError } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: ref ? { data: { referred_by: ref } } : undefined,
+          options: {
+            ...(ref ? { data: { referred_by: ref } } : {}),
+            emailRedirectTo: ref
+              ? `${window.location.origin}/login?ref=${encodeURIComponent(ref)}`
+              : `${window.location.origin}/login`,
+          },
         });
         if (authError) throw authError;
         if (!data.session) {

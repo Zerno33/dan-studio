@@ -5,6 +5,18 @@ export function normalizeReferralCode(raw: string): string | null {
   return v;
 }
 
+export function referredByFromAuthUser(user: {
+  user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
+} | null | undefined): string | null {
+  const raw =
+    user?.user_metadata?.referred_by ??
+    user?.user_metadata?.referral_code ??
+    user?.app_metadata?.referred_by ??
+    "";
+  return normalizeReferralCode(String(raw || ""));
+}
+
 export async function findTeacherByCode(
   supabaseAdmin: { from: (table: string) => any },
   code: string

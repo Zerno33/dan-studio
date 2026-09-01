@@ -1305,7 +1305,8 @@ export default function PromptEngine() {
               >
                 <span>{u.email}</span>
                 <span style={{ color: T.muted }}>saldo {u.credits?.balance ?? "—"}</span>
-                <span style={{ color: T.muted, fontSize: 10 }}>ref {u.referral_code || "—"}</span>
+                <span style={{ color: T.muted, fontSize: 10 }}>kod {u.referral_code || "—"}</span>
+                <span style={{ color: T.muted, fontSize: 10 }}>od {u.referred_by || "—"}</span>
                 <button
                   type="button"
                   style={ghostBtn}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
-import { normalizeReferralCode, linkReferralRow, findTeacherByCode } from "@/lib/referral";
+import { linkReferralRow, findTeacherByCode, referredByFromAuthUser } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -115,7 +115,10 @@ export async function GET(req: NextRequest) {
   const isAdmin =
     makeAdmin || bootstrapFirstAdmin || !!profile?.is_admin || !!profilePatch.is_admin;
 
-  const metaCode = normalizeReferralCode(String((user.user_metadata as { referred_by?: string })?.referred_by || ""));
+  const { data: authFull } = await supabaseAdmin.auth.admin.getUserById(user.id);
+  const metaCode =
+    referredByFromAuthUser(authFull?.user) ||
+    referredByFromAuthUser(user as { user_metadata?: Record<string, unknown> });
   if (profile && !profile.referred_by && metaCode && metaCode !== profile.referral_code) {
     const teacher = await findTeacherByCode(supabaseAdmin, metaCode);
     if (teacher) {
