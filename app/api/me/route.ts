@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       .eq("id", user.id)
       .single();
   }
-  const profile = profileRes.data as {
+  let profile = profileRes.data as {
     email?: string;
     is_admin?: boolean;
     is_banned?: boolean;
@@ -71,6 +71,15 @@ export async function GET(req: NextRequest) {
       is_admin: !!(makeAdmin || bootstrapFirstAdmin),
       consent_at: new Date().toISOString(),
     });
+    profile = {
+      email: user.email,
+      is_admin: !!(makeAdmin || bootstrapFirstAdmin),
+      is_banned: false,
+      consent_at: new Date().toISOString(),
+      referred_by: null,
+      referral_code: null,
+      onboarding_completed_at: null,
+    };
   } else if (Object.keys(profilePatch).length) {
     await supabaseAdmin.from("profiles").update(profilePatch).eq("id", user.id);
   }

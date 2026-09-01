@@ -30,6 +30,7 @@ export async function linkReferralRow(
   teacherId: string,
   userId: string
 ) {
+  if (teacherId === userId) return;
   const { error } = await supabaseAdmin.from("referrals").upsert(
     {
       teacher_id: teacherId,
@@ -39,7 +40,7 @@ export async function linkReferralRow(
     },
     { onConflict: "user_id" }
   );
-  if (error && !/relation|does not exist|referrals/i.test(String((error as { message?: string }).message))) {
+  if (error) {
     console.error("referrals upsert:", (error as { message?: string }).message);
   }
 }

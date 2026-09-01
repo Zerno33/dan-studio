@@ -46,8 +46,8 @@ export default function LoginPage() {
       if (!consent) throw new Error("Zaznacz checkbox zgody pod hasłem.");
       if (!email.trim() || !password) throw new Error("Wpisz email i hasło.");
       const supabase = await getSupabaseBrowser();
+      const ref = typeof window !== "undefined" ? localStorage.getItem("brns_ref") : null;
       if (mode === "up") {
-        const ref = typeof window !== "undefined" ? localStorage.getItem("brns_ref") : null;
         const { data, error: authError } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -65,7 +65,7 @@ export default function LoginPage() {
         });
         if (authError) throw authError;
       }
-      window.location.href = "/";
+      window.location.href = ref ? `/?ref=${encodeURIComponent(ref)}` : "/";
     } catch (e: any) {
       setError(polishAuthError(e.message || "Błąd logowania."));
     } finally {

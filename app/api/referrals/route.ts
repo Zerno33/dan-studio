@@ -18,10 +18,35 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ referrals: [], payoutPending: false, commissionTotal: 0 });
+    console.error("referrals list:", error.message);
   }
 
-  const ids = (rows || []).map((r) => r.user_id);
+  const { data: byCode } = await supabaseAdmin
+    .from("profiles")
+    .select("id, email, is_banned")
+    .eq("referred_by", me.referral_code);
+
+  for (const p of byCode || []) {
+    if (p.id === user.id) continue;
+    await supabaseAdmin.from("referrals").upsert(
+      {
+        teacher_id: user.id,
+        user_id: p.id,
+        status: "active",
+        commission_accrued: 0,
+      },
+      { onConflict: "user_id" }
+    );
+  }
+
+  const { data: rows2 } = await supabaseAdmin
+    .from("referrals")
+    .select("id, status, commission_accrued, created_at, user_id")
+    .eq("teacher_id", user.id)
+    .order("created_at", { ascending: false });
+
+  const list = rows2 || rows || [];
+  const ids = [...new Set([...list.map((r) => r.user_id), ...(byCode || []).map((p) => p.id)])];
   let people: { id: string; email: string | null; is_banned: boolean }[] = [];
   if (ids.length) {
     const got = await supabaseAdmin.from("profiles").select("id, email, is_banned").in("id", ids);
@@ -29,7 +54,7 @@ export async function GET(req: NextRequest) {
   }
 
   const byId = new Map((people || []).map((p) => [p.id, p]));
-  const referrals = (rows || []).map((r) => {
+  const fromRows = list.map((r) => {
     const p = byId.get(r.user_id);
     return {
       id: r.id,
@@ -39,6 +64,16 @@ export async function GET(req: NextRequest) {
       created_at: r.created_at,
     };
   });
+  const extras = (byCode || [])
+    .filter((p) => p.id !== user.id && !list.some((r) => r.user_id === p.id))
+    .map((p) => ({
+      id: p.id,
+      email: p.email || "—",
+      status: p.is_banned ? "inactive" : "active",
+      commission: 0,
+      created_at: "",
+    }));
+  const referrals = [...fromRows, ...extras];
 
   const { data: pending } = await supabaseAdmin
     .from("payout_requests")
