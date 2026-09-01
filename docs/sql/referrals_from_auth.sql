@@ -1,4 +1,7 @@
--- referred_by w BRNS jest uuid (stary szkic). Aplikacja zapisuje kod tekstowy (np. mati).
+-- Stary szkic: referred_by = uuid nauczyciela (FK na profiles.id).
+-- Aplikacja zapisuje kod z URL (?ref=mati). Zdejmujemy FK i zmieniamy na text.
+alter table public.profiles drop constraint if exists profiles_referred_by_fkey;
+
 alter table public.profiles
   alter column referred_by type text using referred_by::text;
 
