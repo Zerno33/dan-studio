@@ -40,6 +40,8 @@ where u.id = p.id
   and (p.referred_by is null or p.referred_by = '')
   and coalesce(u.raw_user_meta_data->>'referred_by', '') ~ '^[A-Za-z0-9_-]{1,32}$';
 
+create unique index if not exists referrals_user_id_uidx on public.referrals (user_id);
+
 insert into public.referrals (teacher_id, user_id, status, commission_accrued)
 select t.id, s.id, 'active', 0
 from public.profiles s
@@ -47,4 +49,4 @@ join public.profiles t on t.referral_code = s.referred_by
 where s.referred_by is not null
   and s.referred_by <> ''
   and s.id <> t.id
-on conflict (user_id) do nothing;
+  and not exists (select 1 from public.referrals r where r.user_id = s.id);
