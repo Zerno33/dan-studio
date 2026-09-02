@@ -37,7 +37,7 @@ update public.profiles p
 set referred_by = lower(trim(u.raw_user_meta_data->>'referred_by'))
 from auth.users u
 where u.id = p.id
-  and (p.referred_by is null or p.referred_by = '')
+  and p.referred_by is null
   and coalesce(u.raw_user_meta_data->>'referred_by', '') ~ '^[A-Za-z0-9_-]{1,32}$';
 
 create unique index if not exists referrals_user_id_uidx on public.referrals (user_id);
@@ -47,6 +47,5 @@ select t.id, s.id, 'active', 0
 from public.profiles s
 join public.profiles t on t.referral_code = s.referred_by
 where s.referred_by is not null
-  and s.referred_by <> ''
   and s.id <> t.id
   and not exists (select 1 from public.referrals r where r.user_id = s.id);
