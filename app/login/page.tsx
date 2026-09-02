@@ -14,6 +14,13 @@ function polishAuthError(message: string) {
   return message;
 }
 
+function authLinkSetsPassword() {
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const query = new URLSearchParams(window.location.search);
+  const t = (hash.get("type") || query.get("type") || "").toLowerCase();
+  return t === "invite" || t === "recovery";
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +33,8 @@ export default function LoginPage() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("ref");
     if (q?.trim()) localStorage.setItem("brns_ref", q.trim().toLowerCase());
+
+    if (authLinkSetsPassword()) setRecovery(true);
 
     let unsub: { unsubscribe: () => void } | undefined;
     (async () => {
@@ -137,7 +146,8 @@ export default function LoginPage() {
   if (recovery) {
     return (
       <main style={{ maxWidth: 420, margin: "80px auto", padding: 24 }}>
-        <h1 style={{ color: "#E5152A" }}>NOWE HASŁO</h1>
+        <h1 style={{ color: "#E5152A" }}>USTAW HASŁO</h1>
+        <p style={{ color: "#8A8A8A", fontSize: 13 }}>Zaproszenie albo reset — wymyśl hasło (min. 6 znaków), potem wejdziesz na konsolę.</p>
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nowe hasło" style={field} />
         {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
         <button disabled={busy} onClick={saveNewPassword} style={btn}>
