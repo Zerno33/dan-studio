@@ -333,6 +333,7 @@ export default function PromptEngine() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>("konsola");
   const [email, setEmail] = useState("");
+  const [myUserId, setMyUserId] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [referredCount, setReferredCount] = useState(0);
@@ -399,6 +400,7 @@ export default function PromptEngine() {
       try {
         const me = await authFetch("/api/me");
         setEmail(me.user.email || "");
+        setMyUserId(me.user.id || "");
         setIsAdmin(me.user.isAdmin);
         setReferralCode(me.user.referralCode || "");
         setReferredCount(me.referredCount || 0);
@@ -1334,6 +1336,21 @@ export default function PromptEngine() {
                 >
                   {u.is_banned ? "ODBANUJ" : "BAN"}
                 </button>
+                {u.id !== myUserId && (
+                  <button
+                    type="button"
+                    style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
+                    onClick={async () => {
+                      const mail = u.email || u.id;
+                      if (!window.confirm(`Na zawsze skasować ${mail}? Mail wróci do puli. Tego nie cofniesz.`)) return;
+                      if (!window.confirm("Na pewno? Znikną prompty, kredyty i konto Auth.")) return;
+                      await authFetch(`/api/admin/users/${u.id}`, { method: "DELETE" });
+                      await loadAdminShell();
+                    }}
+                  >
+                    USUŃ KONTO
+                  </button>
+                )}
               </div>
             ))}
 
