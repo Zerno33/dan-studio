@@ -12,8 +12,8 @@ import { SupabaseClient } from "@supabase/supabase-js";
 const MAX_REQUESTS_PER_MINUTE = 10;
 const MAX_REQUESTS_PER_HOUR = 100;
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB per obraz (przed base64)
-const MAX_TOTAL_IMAGE_BYTES = 25 * 1024 * 1024; // 25 MB suma na request
+const MAX_IMAGE_BYTES = 1.2 * 1024 * 1024;
+const MAX_TOTAL_IMAGE_BYTES = 3.5 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 export type GuardResult = { ok: true } | { ok: false; error: string };
@@ -67,12 +67,12 @@ export function validateImages(
     }
     const size = base64ByteSize(img.base64);
     if (size > MAX_IMAGE_BYTES) {
-      return { ok: false, error: `Obraz przekracza limit ${MAX_IMAGE_BYTES / 1024 / 1024} MB.` };
+      return { ok: false, error: "Obraz za duży (max ~1.2 MB po kompresji). Wrzucamy mniejszy JPEG." };
     }
     total += size;
   }
   if (total > MAX_TOTAL_IMAGE_BYTES) {
-    return { ok: false, error: `Suma obrazów przekracza limit ${MAX_TOTAL_IMAGE_BYTES / 1024 / 1024} MB.` };
+    return { ok: false, error: "Suma zdjęć za duża na jeden strzał (limit Vercel ~4 MB). Daj 5–6 na raz albo mniejsze pliki." };
   }
   return { ok: true };
 }

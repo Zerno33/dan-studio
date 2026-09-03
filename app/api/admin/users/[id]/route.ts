@@ -26,6 +26,9 @@ export async function DELETE(
   if (!id || id === admin.id) {
     return NextResponse.json({ error: "Nie możesz usunąć własnego konta." }, { status: 403 });
   }
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    return NextResponse.json({ error: "Nieprawidłowe konto." }, { status: 400 });
+  }
 
   const supabaseAdmin = getSupabaseAdmin();
 

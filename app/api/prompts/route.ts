@@ -38,6 +38,20 @@ export async function GET(req: NextRequest) {
     data = retry.data as typeof data;
     error = retry.error;
   }
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    let q3 = supabaseAdmin
+      .from("prompts")
+      .select("id, prompt, negative, word_count, format_mode, folder_id, system_id, system_version, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(80);
+    if (folderId) q3 = q3.eq("folder_id", folderId);
+    if (systemId) q3 = q3.eq("system_id", systemId);
+    const slim = await q3;
+    if (!slim.error) {
+      return NextResponse.json({ prompts: slim.data });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ prompts: data });
 }

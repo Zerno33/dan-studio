@@ -148,20 +148,41 @@ async function authFetch(path: string, init: RequestInit = {}) {
     },
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 413) {
+      throw new Error("Za dużo danych (HTTP 413). Na N1 daj mniej zdjęć albo mniejsze pliki — Vercel ucina request powyżej ~4 MB.");
+    }
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
   return json;
 }
 
 function fileToImage(file: File): Promise<{ id: string; base64: string; mime: string }> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Nie udało się odczytać pliku."));
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const max = 1280;
+      const scale = Math.min(1, max / Math.max(img.width, img.height, 1));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Nie udało się zmniejszyć zdjęcia."));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
       const base64 = dataUrl.split(",")[1] || "";
-      resolve({ id: Math.random().toString(36).slice(2, 10), base64, mime: file.type || "image/jpeg" });
+      resolve({ id: Math.random().toString(36).slice(2, 10), base64, mime: "image/jpeg" });
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Nie udało się odczytać pliku."));
+    };
+    img.src = url;
   });
 }
 
@@ -506,13 +527,17 @@ export default function PromptEngine() {
   }
 
   async function loadLibrary() {
-    const json = await authFetch("/api/prompts");
-    const rows: any[] = json.prompts || [];
-    const byId = new Map<string, any>();
-    for (const p of rows) {
-      if (p?.id && !byId.has(p.id)) byId.set(p.id, p);
+    try {
+      const json = await authFetch("/api/prompts");
+      const rows: any[] = json.prompts || [];
+      const byId = new Map<string, any>();
+      for (const p of rows) {
+        if (p?.id && !byId.has(p.id)) byId.set(p.id, p);
+      }
+      setLibrary(byId.size ? [...byId.values()] : rows);
+    } catch (e: any) {
+      setLoadErr(e.message || "Nie wczytano biblioteki.");
     }
-    setLibrary(byId.size ? [...byId.values()] : rows);
   }
 
   async function loadAdminShell() {
