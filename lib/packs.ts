@@ -8,9 +8,10 @@ export const TEACHER_SHARE_OF_PAYMENT = TARGET_GROSS_MARGIN * TEACHER_SHARE_OF_M
 export const SELL_PRICE_PER_CREDIT_USD = 1 / CREDITS_PER_USD;
 
 export function packUsdFromCredits(credits: number): number | null {
-  if (!Number.isInteger(credits) || credits <= 0) return null;
-  if (credits % CREDITS_PER_USD !== 0) return null;
-  const usd = credits / CREDITS_PER_USD;
+  const n = Math.round(Number(credits));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n % CREDITS_PER_USD !== 0) return null;
+  const usd = n / CREDITS_PER_USD;
   if (usd < MIN_PACK_USD || usd > MAX_PACK_USD) return null;
   return usd;
 }

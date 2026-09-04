@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
+import { teacherCashflow } from "@/lib/teacher-cashflow";
 
 export const dynamic = "force-dynamic";
 
@@ -63,15 +64,23 @@ export async function GET(req: NextRequest) {
       created_at: r.created_at,
     };
   });
-  const extras = (byCode || [])
-    .filter((p) => p.id !== user.id && !list.some((r) => r.user_id === p.id))
-    .map((p) => ({
-      id: p.id,
-      email: p.email || "—",
-      status: p.is_banned ? "inactive" : "active",
-      commission: 0,
-      created_at: "",
-    }));
+  const extraPeople = (byCode || []).filter((p) => p.id !== user.id && !list.some((r) => r.user_id === p.id));
+  const extraIds = extraPeople.map((p) => p.id);
+  let extraComm = new Map<string, number>();
+  if (extraIds.length) {
+    const { data: extraRows } = await supabaseAdmin
+      .from("referrals")
+      .select("user_id, commission_accrued")
+      .in("user_id", extraIds);
+    extraComm = new Map((extraRows || []).map((r) => [r.user_id, Number(r.commission_accrued || 0)]));
+  }
+  const extras = extraPeople.map((p) => ({
+    id: p.id,
+    email: p.email || "—",
+    status: p.is_banned ? "inactive" : "active",
+    commission: extraComm.get(p.id) ?? 0,
+    created_at: "",
+  }));
   const referrals = [...fromRows, ...extras];
 
   const { data: pending } = await supabaseAdmin
@@ -108,7 +117,13 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (open?.id) return NextResponse.json({ error: "Masz już zgłoszenie oczekujące." }, { status: 409 });
 
-  const { error } = await supabaseAdmin.from("payout_requests").insert({ teacher_id: user.id, status: "pending" });
+  const { owed } = await teacherCashflow(supabaseAdmin);
+  const due = owed.get(user.id) || 0;
+  if (due <= 0) return NextResponse.json({ error: "Brak prowizji do wypłaty." }, { status: 400 });
+
+  const { error } = await supabaseAdmin
+    .from("payout_requests")
+    .insert({ teacher_id: user.id, status: "pending", note: `usd:${due.toFixed(2)}` });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

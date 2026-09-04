@@ -364,7 +364,19 @@ export default function PromptEngine() {
     commissionTotal: number;
     payoutPending: boolean;
   } | null>(null);
-  const [payouts, setPayouts] = useState<{ id: string; email: string; status: string; created_at: string }[]>([]);
+  const [payouts, setPayouts] = useState<
+    {
+      id: string;
+      email: string;
+      status: string;
+      created_at: string;
+      owedUsd?: number;
+      requestedUsd?: number;
+      earnedUsd?: number;
+      paidUsd?: number;
+    }[]
+  >([]);
+  const [payoutCashflow, setPayoutCashflow] = useState<{ owedTotalUsd: number; pendingCount: number } | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [systems, setSystems] = useState<PublicSystem[]>([]);
   const [systemSlug, setSystemSlug] = useState<"n1" | "s1" | "r1">("n1");
@@ -553,6 +565,7 @@ export default function PromptEngine() {
     setAdminUsers(users.users || []);
     setCostSummary(cost);
     setPayouts(pay.payouts || []);
+    setPayoutCashflow(pay.cashflow || users.cashflow || null);
     setRatingsSummary(ratings.summary || {});
     setEditId(null);
     setEditPrompt("");
@@ -640,11 +653,16 @@ export default function PromptEngine() {
       {adminModal && (
         <StudioModal title={adminModal.kind === "credits" ? "KREDYTY" : "KOD REF"} onClose={() => setAdminModal(null)}>
           <div style={{ fontSize: 11, color: T.muted, marginBottom: 8 }}>{adminModal.email}</div>
+          {adminModal.kind === "credits" && (
+            <div style={{ fontSize: 11, color: T.muted, marginBottom: 8, lineHeight: 1.6 }}>
+              Generacje nie liczą prowizji. Wpłata na betę = doładuj 900 / 1200 / … / 3000 kr ($3–$10). 900 kr = $0.60 dla nauczyciela.
+            </div>
+          )}
           <input
             autoFocus
             value={adminModal.value}
             onChange={(e) => setAdminModal({ ...adminModal, value: e.target.value })}
-            placeholder={adminModal.kind === "credits" ? "50" : "ania"}
+            placeholder={adminModal.kind === "credits" ? "900" : "ania"}
             style={{
               width: "100%",
               fontFamily: MONO,
@@ -664,21 +682,29 @@ export default function PromptEngine() {
               type="button"
               style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
               onClick={async () => {
-                if (adminModal.kind === "credits") {
-                  const amount = Number(adminModal.value);
-                  if (!Number.isFinite(amount)) return;
-                  await authFetch(`/api/admin/users/${adminModal.userId}/credits`, {
-                    method: "POST",
-                    body: JSON.stringify({ amount }),
-                  });
-                } else {
-                  await authFetch(`/api/admin/users/${adminModal.userId}/referral`, {
-                    method: "POST",
-                    body: JSON.stringify({ code: adminModal.value }),
-                  });
+                try {
+                  if (adminModal.kind === "credits") {
+                    const amount = Number(String(adminModal.value).replace(",", "."));
+                    if (!Number.isFinite(amount) || amount === 0) return;
+                    const json = await authFetch(`/api/admin/users/${adminModal.userId}/credits`, {
+                      method: "POST",
+                      body: JSON.stringify({ amount }),
+                    });
+                    if (json.commissionError) window.alert(json.commissionError);
+                    else if (json.commissionAdded > 0) {
+                      window.alert(`Doładowano. Prowizja nauczyciela +$${Number(json.commissionAdded).toFixed(2)}`);
+                    }
+                  } else {
+                    await authFetch(`/api/admin/users/${adminModal.userId}/referral`, {
+                      method: "POST",
+                      body: JSON.stringify({ code: adminModal.value }),
+                    });
+                  }
+                  setAdminModal(null);
+                  await loadAdminShell();
+                } catch (e: unknown) {
+                  window.alert(e instanceof Error ? e.message : "Błąd zapisu.");
                 }
-                setAdminModal(null);
-                await loadAdminShell();
               }}
             >
               ZAPISZ
@@ -1285,7 +1311,48 @@ export default function PromptEngine() {
 
         {tab === "admin" && isAdmin && (
           <section>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>WYPŁATY NAUCZYCIELI</h2>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>CASHFLOW NAUCZYCIELE</h2>
+            <div style={{ fontSize: 13, margin: "8px 0 16px", lineHeight: 1.7 }}>
+              Do wypłaty łącznie:{" "}
+              <span style={{ color: T.green }}>
+                ${Number(payoutCashflow?.owedTotalUsd ?? adminUsers.reduce((s, u) => s + Number(u.teacherOwedUsd || 0), 0)).toFixed(2)}
+              </span>
+              <span style={{ color: T.muted, fontSize: 11 }}>
+                {" "}
+                · zgłoszenia pending {payoutCashflow?.pendingCount ?? payouts.filter((p) => p.status === "pending").length}
+              </span>
+              <div style={{ fontSize: 11, color: T.muted, marginTop: 6 }}>
+                Winne = wyrobione − już oznaczone jako wypłacone. Nie czekaj na ZLEĆ WYPŁATĘ — kwoty są przy każdym nauczycielu.
+              </div>
+            </div>
+            {adminUsers
+              .filter((u) => u.referral_code || Number(u.teacherCommissionUsd) > 0 || Number(u.teacherOwedUsd) > 0)
+              .sort((a, b) => Number(b.teacherOwedUsd || 0) - Number(a.teacherOwedUsd || 0))
+              .map((u) => (
+                <div
+                  key={`tc-${u.id}`}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    fontSize: 12,
+                    padding: "8px 0",
+                    borderBottom: `1px solid ${T.line}`,
+                  }}
+                >
+                  <span>
+                    {u.email} <span style={{ color: T.muted }}>kod {u.referral_code || "—"}</span>
+                  </span>
+                  <span style={{ color: T.muted, textAlign: "right" }}>
+                    wyrobione ${Number(u.teacherCommissionUsd || 0).toFixed(2)}
+                    {" · "}
+                    wypłacone ${Number(u.teacherPaidUsd || 0).toFixed(2)}
+                    {" · "}
+                    <span style={{ color: T.text }}>winne ${Number(u.teacherOwedUsd || 0).toFixed(2)}</span>
+                  </span>
+                </div>
+              ))}
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 24 }}>ZGŁOSZENIA WYPŁAT</h2>
             {payouts.map((p) => (
               <div
                 key={p.id}
@@ -1300,7 +1367,11 @@ export default function PromptEngine() {
                 }}
               >
                 <span>{p.email}</span>
-                <span style={{ color: T.muted }}>{p.status}</span>
+                <span style={{ color: T.muted }}>
+                  {p.status}
+                  {p.requestedUsd ? ` · zgłoszone $${Number(p.requestedUsd).toFixed(2)}` : ""}
+                  {p.status === "pending" && p.owedUsd != null ? ` · winne $${Number(p.owedUsd).toFixed(2)}` : ""}
+                </span>
                 {p.status === "pending" && (
                   <button
                     type="button"
@@ -1339,6 +1410,14 @@ export default function PromptEngine() {
                 <span style={{ color: T.muted }}>saldo {u.credits?.balance ?? "—"}</span>
                 <span style={{ color: T.muted, fontSize: 10 }}>kod {u.referral_code || "—"}</span>
                 <span style={{ color: T.muted, fontSize: 10 }}>od {u.referred_by || "—"}</span>
+                {(u.referral_code || Number(u.teacherCommissionUsd) > 0) && (
+                  <span style={{ color: T.green, fontSize: 10 }}>
+                    winne ${Number(u.teacherOwedUsd || 0).toFixed(2)}
+                    {Number(u.teacherCommissionUsd) > 0
+                      ? ` (wyrobione ${Number(u.teacherCommissionUsd).toFixed(2)})`
+                      : ""}
+                  </span>
+                )}
                 <button
                   type="button"
                   style={ghostBtn}
@@ -1349,7 +1428,7 @@ export default function PromptEngine() {
                 <button
                   type="button"
                   style={ghostBtn}
-                  onClick={() => setAdminModal({ kind: "credits", userId: u.id, email: u.email, value: "50" })}
+                  onClick={() => setAdminModal({ kind: "credits", userId: u.id, email: u.email, value: "900" })}
                 >
                   KREDYTY
                 </button>

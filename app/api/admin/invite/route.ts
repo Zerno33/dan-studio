@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, getSupabaseAdmin } from "@/lib/auth";
+import { accrueTeacherCommissionFromGrant } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
       delta: credits,
       reason: "admin_grant",
     });
+    await accrueTeacherCommissionFromGrant(supabaseAdmin, userId, credits);
   }
 
   return NextResponse.json({ ok: true, userId, email });

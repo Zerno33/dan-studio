@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, getSupabaseAdmin } from "@/lib/auth";
+import { teacherCashflow } from "@/lib/teacher-cashflow";
 
 // Nigdy nie prerenderować statycznie — endpoint zależy od nagłówka
 // Authorization i env vars w runtime, nie w czasie builda.
@@ -17,5 +18,15 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ users: data });
+
+  const { earned, paid, owed, owedTotalUsd } = await teacherCashflow(supabaseAdmin);
+
+  const users = (data || []).map((u) => ({
+    ...u,
+    teacherCommissionUsd: Number((earned.get(u.id) || 0).toFixed(2)),
+    teacherPaidUsd: Number((paid.get(u.id) || 0).toFixed(2)),
+    teacherOwedUsd: owed.get(u.id) || 0,
+  }));
+
+  return NextResponse.json({ users, cashflow: { owedTotalUsd } });
 }
