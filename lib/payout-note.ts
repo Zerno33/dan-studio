@@ -9,3 +9,11 @@ export function parsePayoutNoteUsd(note: string | null | undefined): number {
 export function roundUsd(n: number): number {
   return Number(n.toFixed(2));
 }
+
+export type PayoutStatus = "pending" | "in_transit" | "done";
+
+export function parsePayoutStatus(raw: unknown): PayoutStatus | null {
+  const s = String(raw || "");
+  if (s === "pending" || s === "in_transit" || s === "done") return s;
+  return null;
+}

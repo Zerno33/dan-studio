@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
     .from("payout_requests")
     .select("id")
     .eq("teacher_id", user.id)
-    .eq("status", "pending")
+    .in("status", ["pending", "in_transit"])
     .maybeSingle();
 
   const commissionTotal = referrals.reduce((s, r) => s + r.commission, 0);
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     .from("payout_requests")
     .select("id")
     .eq("teacher_id", user.id)
-    .eq("status", "pending")
+    .in("status", ["pending", "in_transit"])
     .maybeSingle();
   if (open?.id) return NextResponse.json({ error: "Masz już zgłoszenie oczekujące." }, { status: 409 });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, getSupabaseAdmin } from "@/lib/auth";
-import { parsePayoutNoteUsd, roundUsd } from "@/lib/payout-note";
+import { parsePayoutNoteUsd, parsePayoutStatus, roundUsd } from "@/lib/payout-note";
 import { teacherCashflow } from "@/lib/teacher-cashflow";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(80);
 
-  if (error) return NextResponse.json({ payouts: [], cashflow: { owedTotalUsd: 0, pendingCount: 0 } });
+  if (error) return NextResponse.json({ payouts: [], cashflow: { owedTotalUsd: 0, pendingCount: 0, inTransitCount: 0 } });
 
   const { earned, paid, owed, owedTotalUsd } = await teacherCashflow(supabaseAdmin);
   const ids = [...new Set((data || []).map((p) => p.teacher_id))];
@@ -26,9 +26,10 @@ export async function GET(req: NextRequest) {
   const byId = new Map((teachers || []).map((t) => [t.id, t]));
 
   const pendingCount = (data || []).filter((p) => p.status === "pending").length;
+  const inTransitCount = (data || []).filter((p) => p.status === "in_transit").length;
 
   return NextResponse.json({
-    cashflow: { owedTotalUsd, pendingCount },
+    cashflow: { owedTotalUsd, pendingCount, inTransitCount },
     payouts: (data || []).map((p) => ({
       ...p,
       email: byId.get(p.teacher_id)?.email || "—",
@@ -47,8 +48,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const id = String(body.id || "");
-  const status = body.status === "done" ? "done" : "pending";
+  const status = parsePayoutStatus(body.status);
   if (!id) return NextResponse.json({ error: "Brak id." }, { status: 400 });
+  if (!status) return NextResponse.json({ error: "Status: pending, in_transit albo done." }, { status: 400 });
 
   const supabaseAdmin = getSupabaseAdmin();
   const { data: row } = await supabaseAdmin
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
 
   if (status === "done") {
     const { owed } = await teacherCashflow(supabaseAdmin);
-    const pay = owed.get(row.teacher_id) || parsePayoutNoteUsd(row.note);
+    const pay = parsePayoutNoteUsd(row.note) || owed.get(row.teacher_id) || 0;
     const { error } = await supabaseAdmin
       .from("payout_requests")
       .update({ status: "done", note: `paid:${roundUsd(pay)}` })
