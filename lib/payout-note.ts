@@ -10,6 +10,11 @@ export function roundUsd(n: number): number {
   return Number(n.toFixed(2));
 }
 
+export function isMissingNoteColumn(message: string | undefined): boolean {
+  const m = (message || "").toLowerCase();
+  return m.includes("note") && (m.includes("schema cache") || m.includes("column"));
+}
+
 export type PayoutStatus = "pending" | "in_transit" | "done";
 
 export function parsePayoutStatus(raw: unknown): PayoutStatus | null {

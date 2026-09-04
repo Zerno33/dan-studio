@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
 import { teacherCashflow } from "@/lib/teacher-cashflow";
+import { isMissingNoteColumn } from "@/lib/payout-note";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,11 @@ export async function POST(req: NextRequest) {
   const { error } = await supabaseAdmin
     .from("payout_requests")
     .insert({ teacher_id: user.id, status: "pending", note: `usd:${due.toFixed(2)}` });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error && isMissingNoteColumn(error.message)) {
+    const retry = await supabaseAdmin.from("payout_requests").insert({ teacher_id: user.id, status: "pending" });
+    if (retry.error) return NextResponse.json({ error: retry.error.message }, { status: 500 });
+  } else if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, amount: due });
 }
