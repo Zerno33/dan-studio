@@ -362,8 +362,11 @@ export default function PromptEngine() {
     referrals: { id: string; email: string; status: string; commission: number }[];
     activeCount: number;
     commissionTotal: number;
+    payoutDueUsd?: number;
     payoutPending: boolean;
   } | null>(null);
+  const [payoutBusy, setPayoutBusy] = useState(false);
+  const [payoutMsg, setPayoutMsg] = useState("");
   const [payouts, setPayouts] = useState<
     {
       id: string;
@@ -562,7 +565,11 @@ export default function PromptEngine() {
       authFetch("/api/admin/systems?meta=1"),
       authFetch("/api/admin/users"),
       authFetch("/api/admin/cost-summary"),
-      authFetch("/api/admin/payouts").catch(() => ({ payouts: [] })),
+      authFetch("/api/admin/payouts").catch((e: unknown) => ({
+        payouts: [],
+        cashflow: { owedTotalUsd: 0, pendingCount: 0 },
+        error: e instanceof Error ? e.message : "Nie wczytano wypłat.",
+      })),
       authFetch("/api/admin/ratings-summary").catch(() => ({ summary: {} })),
     ]);
     setAdminSystems(sys.systems || []);
@@ -1266,9 +1273,11 @@ export default function PromptEngine() {
                 <br />
                 Poleceni: {teacherStats?.referrals.length ?? referredCount} · aktywni: {teacherStats?.activeCount ?? "—"}
                 <br />
-                Prowizja: ${Number(teacherStats?.commissionTotal ?? 0).toFixed(2)} USD
+                Prowizja wyrobiona: ${Number(teacherStats?.commissionTotal ?? 0).toFixed(2)} USD
                 <br />
-                20% wpłaty poleconego ($0.60 z $3, $0.20 za każdego dolara $3–$10). 40% z Twoich ~50% marży.
+                Do wypłaty: ${Number(teacherStats?.payoutDueUsd ?? 0).toFixed(2)} USD
+                <br />
+                20% wpłaty poleconego ($0.60 z $3). Polar nie ma — zgłoszenie idzie do ADMIN (tickety na dole).
               </p>
               <button
                 type="button"
@@ -1283,14 +1292,28 @@ export default function PromptEngine() {
               <button
                 type="button"
                 style={ghostBtn}
-                disabled={teacherStats?.payoutPending}
+                disabled={teacherStats?.payoutPending || payoutBusy}
                 onClick={async () => {
-                  await authFetch("/api/referrals", { method: "POST" });
-                  await loadTeacher();
+                  setPayoutBusy(true);
+                  setPayoutMsg("");
+                  try {
+                    const json = await authFetch("/api/referrals", { method: "POST" });
+                    setPayoutMsg(
+                      `Wysłane $${Number(json.amount ?? teacherStats?.payoutDueUsd ?? 0).toFixed(2)} — ticket w ADMIN na dole.`
+                    );
+                    await loadTeacher();
+                  } catch (e: unknown) {
+                    setPayoutMsg(e instanceof Error ? e.message : "Nie wysłano zgłoszenia.");
+                  } finally {
+                    setPayoutBusy(false);
+                  }
                 }}
               >
-                {teacherStats?.payoutPending ? "CZEKA NA WYPŁATĘ" : "ZLEĆ WYPŁATĘ"}
+                {payoutBusy ? "WYSYŁAM…" : teacherStats?.payoutPending ? "CZEKA NA WYPŁATĘ" : "ZLEĆ WYPŁATĘ"}
               </button>
+              {payoutMsg && (
+                <div style={{ fontSize: 11, color: T.muted, marginTop: 8, lineHeight: 1.5 }}>{payoutMsg}</div>
+              )}
             </div>
             {(teacherStats?.referrals || []).map((r) => (
               <div
@@ -1494,11 +1517,11 @@ export default function PromptEngine() {
               drodze → zakończono.
             </div>
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>TICKETY</h2>
-            {payouts.filter((p) => p.status === "pending" || p.status === "in_transit").length === 0 && (
-              <p style={{ color: T.muted, fontSize: 11 }}>Brak otwartych zgłoszeń.</p>
+            {payouts.filter((p) => p.status !== "done").length === 0 && (
+              <p style={{ color: T.muted, fontSize: 11 }}>Brak otwartych zgłoszeń. Ticket pojawia się po ZLEĆ WYPŁATĘ u nauczyciela (nie u Ciebie, jeśli masz $0 do wypłaty).</p>
             )}
             {payouts
-              .filter((p) => p.status === "pending" || p.status === "in_transit")
+              .filter((p) => p.status !== "done")
               .map((p) => (
                 <div
                   key={p.id}
@@ -1516,7 +1539,7 @@ export default function PromptEngine() {
                   <span>{p.email}</span>
                   <span style={{ color: T.muted }}>${Number(p.requestedUsd || p.owedUsd || 0).toFixed(2)}</span>
                   <select
-                    value={p.status === "in_transit" ? "in_transit" : "pending"}
+                    value={p.status === "in_transit" ? "in_transit" : p.status === "done" ? "done" : "pending"}
                     onChange={async (e) => {
                       await authFetch("/api/admin/payouts", {
                         method: "POST",

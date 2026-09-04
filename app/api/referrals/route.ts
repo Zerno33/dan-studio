@@ -83,12 +83,16 @@ export async function GET(req: NextRequest) {
   }));
   const referrals = [...fromRows, ...extras];
 
-  const { data: pending } = await supabaseAdmin
+  const { data: openRows } = await supabaseAdmin
     .from("payout_requests")
     .select("id")
     .eq("teacher_id", user.id)
     .in("status", ["pending", "in_transit"])
-    .maybeSingle();
+    .limit(1);
+  const pending = openRows?.[0] || null;
+
+  const { owed } = await teacherCashflow(supabaseAdmin);
+  const payoutDueUsd = owed.get(user.id) || 0;
 
   const commissionTotal = referrals.reduce((s, r) => s + r.commission, 0);
   const activeCount = referrals.filter((r) => r.status === "active").length;
@@ -97,6 +101,7 @@ export async function GET(req: NextRequest) {
     referrals,
     activeCount,
     commissionTotal,
+    payoutDueUsd,
     payoutPending: Boolean(pending?.id),
   });
 }
@@ -109,13 +114,13 @@ export async function POST(req: NextRequest) {
   const { data: me } = await supabaseAdmin.from("profiles").select("referral_code").eq("id", user.id).single();
   if (!me?.referral_code) return NextResponse.json({ error: "Brak kodu nauczyciela." }, { status: 403 });
 
-  const { data: open } = await supabaseAdmin
+  const { data: openRows } = await supabaseAdmin
     .from("payout_requests")
     .select("id")
     .eq("teacher_id", user.id)
     .in("status", ["pending", "in_transit"])
-    .maybeSingle();
-  if (open?.id) return NextResponse.json({ error: "Masz już zgłoszenie oczekujące." }, { status: 409 });
+    .limit(1);
+  if (openRows?.[0]?.id) return NextResponse.json({ error: "Masz już zgłoszenie oczekujące." }, { status: 409 });
 
   const { owed } = await teacherCashflow(supabaseAdmin);
   const due = owed.get(user.id) || 0;
@@ -125,5 +130,5 @@ export async function POST(req: NextRequest) {
     .from("payout_requests")
     .insert({ teacher_id: user.id, status: "pending", note: `usd:${due.toFixed(2)}` });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, amount: due });
 }
