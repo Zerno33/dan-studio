@@ -12,14 +12,14 @@ export async function GET(req: NextRequest) {
   const supabaseAdmin = getSupabaseAdmin();
   let { data, error } = await supabaseAdmin
     .from("payout_requests")
-    .select("id, teacher_id, status, created_at, note")
+    .select("id, teacher_id, status, created_at, note, amount")
     .order("created_at", { ascending: false })
     .limit(80);
 
   if (error && isMissingNoteColumn(error.message)) {
     const retry = await supabaseAdmin
       .from("payout_requests")
-      .select("id, teacher_id, status, created_at")
+      .select("id, teacher_id, status, created_at, amount")
       .order("created_at", { ascending: false })
       .limit(80);
     data = (retry.data || []).map((p) => ({ ...p, note: null as string | null }));
@@ -47,7 +47,9 @@ export async function GET(req: NextRequest) {
       earnedUsd: roundUsd(earned.get(p.teacher_id) || 0),
       paidUsd: roundUsd(paid.get(p.teacher_id) || 0),
       owedUsd: owed.get(p.teacher_id) || 0,
-      requestedUsd: parsePayoutNoteUsd(p.note),
+      requestedUsd: roundUsd(
+        parsePayoutNoteUsd((p as { note?: string }).note) || Number((p as { amount?: number }).amount) || 0
+      ),
     })),
   });
 }

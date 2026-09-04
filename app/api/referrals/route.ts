@@ -127,11 +127,17 @@ export async function POST(req: NextRequest) {
   const due = owed.get(user.id) || 0;
   if (due <= 0) return NextResponse.json({ error: "Brak prowizji do wypłaty." }, { status: 400 });
 
-  const { error } = await supabaseAdmin
-    .from("payout_requests")
-    .insert({ teacher_id: user.id, status: "pending", note: `usd:${due.toFixed(2)}` });
+  const row = {
+    teacher_id: user.id,
+    status: "pending" as const,
+    amount: due,
+    note: `usd:${due.toFixed(2)}`,
+  };
+  const { error } = await supabaseAdmin.from("payout_requests").insert(row);
   if (error && isMissingNoteColumn(error.message)) {
-    const retry = await supabaseAdmin.from("payout_requests").insert({ teacher_id: user.id, status: "pending" });
+    const retry = await supabaseAdmin
+      .from("payout_requests")
+      .insert({ teacher_id: user.id, status: "pending", amount: due });
     if (retry.error) return NextResponse.json({ error: retry.error.message }, { status: 500 });
   } else if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
