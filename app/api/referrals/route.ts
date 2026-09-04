@@ -33,9 +33,8 @@ export async function GET(req: NextRequest) {
         teacher_id: user.id,
         user_id: p.id,
         status: "active",
-        commission_accrued: 0,
       },
-      { onConflict: "user_id" }
+      { onConflict: "user_id", ignoreDuplicates: true }
     );
   }
 

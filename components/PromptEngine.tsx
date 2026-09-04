@@ -410,11 +410,12 @@ export default function PromptEngine() {
 
   const previewCost = useMemo(() => {
     if (!current) return 0;
+    const model = modelOverride || current.model || "";
     return calculateCreditCost(
       { systemSlug, mode, images, variant, count, lengthMode },
-      current.credits_per_block
+      model
     );
-  }, [current, systemSlug, mode, images, variant, count, lengthMode]);
+  }, [current, systemSlug, mode, images, variant, count, lengthMode, modelOverride]);
 
   useEffect(() => {
     (async () => {
@@ -1235,7 +1236,9 @@ export default function PromptEngine() {
                 <br />
                 Poleceni: {teacherStats?.referrals.length ?? referredCount} · aktywni: {teacherStats?.activeCount ?? "—"}
                 <br />
-                Prowizja (zł): {teacherStats?.commissionTotal ?? 0} — naliczanie po płatnościach, jeszcze nie.
+                Prowizja: ${Number(teacherStats?.commissionTotal ?? 0).toFixed(2)} USD
+                <br />
+                20% wpłaty poleconego ($0.60 z $3, $0.20 za każdego dolara $3–$10). 40% z Twoich ~50% marży.
               </p>
               <button
                 type="button"
@@ -1272,7 +1275,9 @@ export default function PromptEngine() {
                 }}
               >
                 <span>{r.email}</span>
-                <span style={{ color: T.muted }}>{r.status}</span>
+                <span style={{ color: T.muted }}>
+                  ${Number(r.commission || 0).toFixed(2)} · {r.status}
+                </span>
               </div>
             ))}
           </div>
@@ -1382,7 +1387,8 @@ export default function PromptEngine() {
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>KOSZT</h2>
             <div style={{ fontSize: 12, color: T.muted, marginBottom: 8 }}>
               USD {costSummary?.summary?.totalCostUsd ?? "—"} · kredyty {costSummary?.summary?.totalCreditsSpent ?? "—"}
-              {costSummary?.summary?.marginWarning ? " · UWAGA marża" : ""}
+              {costSummary?.summary?.blendMarginPct != null ? ` · marża ${costSummary.summary.blendMarginPct}%` : ""}
+              {costSummary?.summary?.marginWarning ? " · UWAGA marża < 40%" : ""}
             </div>
             {(costSummary?.daily || []).slice(0, 14).map((d: { day: string; cost_usd?: number; credits_spent?: number }) => (
               <div key={d.day} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "4px 0", borderBottom: `1px solid ${T.line}` }}>
@@ -1394,7 +1400,15 @@ export default function PromptEngine() {
             ))}
             <h3 style={{ fontSize: 11, letterSpacing: "0.1em", color: T.muted, marginTop: 16 }}>GROK VS GPT</h3>
             {(costSummary?.byModel || []).map(
-              (m: { model: string; generations: number; failed: number; creditsSpent: number; costUsd: number }) => (
+              (m: {
+                model: string;
+                generations: number;
+                failed: number;
+                creditsSpent: number;
+                costUsd: number;
+                marginPct?: number | null;
+                marginLow?: boolean;
+              }) => (
                 <div
                   key={m.model}
                   style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "4px 0", borderBottom: `1px solid ${T.line}` }}
@@ -1402,6 +1416,8 @@ export default function PromptEngine() {
                   <span>{m.model}</span>
                   <span>
                     {m.generations} gen · {m.failed} fail · {m.creditsSpent} kr · {Number(m.costUsd).toFixed(4)} USD
+                    {m.marginPct != null ? ` · ${m.marginPct}%` : ""}
+                    {m.marginLow ? " · nisko" : ""}
                   </span>
                 </div>
               )

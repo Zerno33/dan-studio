@@ -48,9 +48,8 @@ export async function linkReferralRow(
       teacher_id: teacherId,
       user_id: userId,
       status: "active",
-      commission_accrued: 0,
     },
-    { onConflict: "user_id" }
+    { onConflict: "user_id", ignoreDuplicates: true }
   );
   if (error) {
     console.error("referrals upsert:", (error as { message?: string }).message);

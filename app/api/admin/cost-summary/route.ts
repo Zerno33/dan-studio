@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, getSupabaseAdmin } from "@/lib/auth";
+import { SELL_PRICE_PER_CREDIT_USD, TARGET_GROSS_MARGIN, grossMargin } from "@/lib/packs";
 
 // Nigdy nie prerenderować statycznie — endpoint zależy od nagłówka
 // Authorization i env vars w runtime, nie w czasie builda.
@@ -57,15 +58,22 @@ export async function GET(req: NextRequest) {
     }
     byModelMap.set(model, cur);
   }
-  const byModel = [...byModelMap.values()].sort((a, b) => b.costUsd - a.costUsd);
+  const byModel = [...byModelMap.values()]
+    .map((m) => {
+      const margin = grossMargin(m.costUsd, m.creditsSpent);
+      return {
+        ...m,
+        marginPct: margin !== null ? Number((margin * 100).toFixed(0)) : null,
+        marginLow: margin !== null && margin < TARGET_GROSS_MARGIN - 0.1,
+      };
+    })
+    .sort((a, b) => b.costUsd - a.costUsd);
 
   const totalCostUsd = (dailyRes.data ?? []).reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
   const totalCreditsSpent = (dailyRes.data ?? []).reduce((sum, r) => sum + (r.credits_spent ?? 0), 0);
   const avgCostPerCredit = totalCreditsSpent > 0 ? totalCostUsd / totalCreditsSpent : null;
-
-  const ASSUMED_SELL_PRICE_PER_CREDIT_USD = 0.08;
-  const marginWarning =
-    avgCostPerCredit !== null && avgCostPerCredit > ASSUMED_SELL_PRICE_PER_CREDIT_USD * 0.4;
+  const blendMargin = grossMargin(totalCostUsd, totalCreditsSpent);
+  const marginWarning = blendMargin !== null && blendMargin < TARGET_GROSS_MARGIN - 0.1;
 
   return NextResponse.json({
     daily: dailyRes.data,
@@ -75,6 +83,8 @@ export async function GET(req: NextRequest) {
       totalCostUsd: Number(totalCostUsd.toFixed(2)),
       totalCreditsSpent,
       avgCostPerCreditUsd: avgCostPerCredit !== null ? Number(avgCostPerCredit.toFixed(6)) : null,
+      sellPricePerCreditUsd: SELL_PRICE_PER_CREDIT_USD,
+      blendMarginPct: blendMargin !== null ? Number((blendMargin * 100).toFixed(0)) : null,
       marginWarning,
     },
   });

@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
 
   // 3. koszt z mnożnikiem długości (MYS-38) + rezerwacja atomowa (MYS-37)
   const blockCount = expectedBlockCount(body);
-  const cost = calculateCreditCost(body, system.credits_per_block);
+  const cost = calculateCreditCost(body, modelToUse);
 
   let balanceAfterReserve: number;
   try {
