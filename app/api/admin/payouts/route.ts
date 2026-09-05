@@ -62,12 +62,13 @@ export async function GET(req: NextRequest) {
 
   const payouts = (data || []).map((p) => {
     const status = normalizePayoutStatus(p.status);
+    const completedAt = "completed_at" in p ? (p as { completed_at?: string | null }).completed_at : null;
     return {
       id: p.id,
       teacher_id: p.teacher_id,
       status,
       created_at: "created_at" in p ? (p as { created_at?: string }).created_at : undefined,
-      paidAt: parsePaidAt(p.note, "completed_at" in p ? (p as { completed_at?: string | null }).completed_at : null),
+      paidAt: parsePaidAt(p.note, completedAt || null),
       email: byId.get(p.teacher_id)?.email || "—",
       referralCode: byId.get(p.teacher_id)?.referral_code || null,
       earnedUsd: roundUsd(earned.get(p.teacher_id) || 0),

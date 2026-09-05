@@ -11,9 +11,15 @@ export function paidNote(usd: number, atIso: string): string {
 }
 
 export function parsePaidAt(note?: string | null, completedAt?: string | null): string | null {
-  if (completedAt) return completedAt;
-  const m = (note || "").match(/done:([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)/i);
-  return m?.[1] || null;
+  if (completedAt) {
+    const fromCol = new Date(completedAt);
+    if (!Number.isNaN(fromCol.getTime())) return fromCol.toISOString();
+  }
+  const m = (note || "").match(/done:(\S+)/i);
+  if (!m) return null;
+  const raw = m[1].replace(/[,;].*$/, "");
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 export function roundUsd(n: number): number {

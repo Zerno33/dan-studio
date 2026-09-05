@@ -94,10 +94,16 @@ function pasteTargetIsField(target: EventTarget | null) {
 }
 
 function formatPaidWhen(iso: string | null | undefined) {
-  if (!iso) return "—";
+  if (!iso) return "brak godziny (stary ticket)";
   const when = new Date(iso);
-  if (Number.isNaN(when.getTime())) return "—";
+  if (Number.isNaN(when.getTime())) return "brak godziny (stary ticket)";
   return when.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
+}
+
+function formatCostDay(day: string) {
+  const when = new Date(day);
+  if (Number.isNaN(when.getTime())) return day;
+  return when.toLocaleDateString("pl-PL");
 }
 
 function StudioModal({
@@ -1591,9 +1597,12 @@ export default function PromptEngine() {
               {costSummary?.summary?.blendMarginPct != null ? ` · marża ${costSummary.summary.blendMarginPct}%` : ""}
               {costSummary?.summary?.marginWarning ? " · UWAGA marża < 40%" : ""}
             </div>
+            <p style={{ fontSize: 11, color: T.muted, margin: "0 0 8px", lineHeight: 1.5 }}>
+              Suma za dzień, nie godzina pojedynczej generacji.
+            </p>
             {(costSummary?.daily || []).slice(0, 14).map((d: { day: string; cost_usd?: number; credits_spent?: number }) => (
               <div key={d.day} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "4px 0", borderBottom: `1px solid ${T.line}` }}>
-                <span>{d.day}</span>
+                <span>{formatCostDay(d.day)}</span>
                 <span>
                   {d.cost_usd ?? 0} USD / {d.credits_spent ?? 0} kr
                 </span>
