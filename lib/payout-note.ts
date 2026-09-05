@@ -6,6 +6,16 @@ export function parsePayoutNoteUsd(note: string | null | undefined): number {
   return usd ? Number(usd[1]) || 0 : 0;
 }
 
+export function paidNote(usd: number, atIso: string): string {
+  return `paid:${roundUsd(usd)} done:${atIso}`;
+}
+
+export function parsePaidAt(note?: string | null, completedAt?: string | null): string | null {
+  if (completedAt) return completedAt;
+  const m = (note || "").match(/done:([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z)/i);
+  return m?.[1] || null;
+}
+
 export function roundUsd(n: number): number {
   return Number(n.toFixed(2));
 }

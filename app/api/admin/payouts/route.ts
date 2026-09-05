@@ -3,8 +3,8 @@ import { requireAdmin, getSupabaseAdmin } from "@/lib/auth";
 import {
   parsePayoutNoteUsd,
   parsePayoutStatus,
+  paidNote,
   roundUsd,
-  isMissingNoteColumn,
   normalizePayoutStatus,
 } from "@/lib/payout-note";
 import { teacherCashflow } from "@/lib/teacher-cashflow";
@@ -95,31 +95,45 @@ export async function POST(req: NextRequest) {
   const supabaseAdmin = getSupabaseAdmin();
   const { data: row, error: rowErr } = await supabaseAdmin
     .from("payout_requests")
-    .select("id, teacher_id, note")
+    .select("id, teacher_id, note, amount")
     .eq("id", id)
     .maybeSingle();
   const rowSafe =
     row ||
-    (rowErr && isMissingNoteColumn(rowErr.message)
+    (rowErr
       ? (
-          await supabaseAdmin.from("payout_requests").select("id, teacher_id").eq("id", id).maybeSingle()
-        ).data
+          await supabaseAdmin.from("payout_requests").select("id, teacher_id, amount").eq("id", id).maybeSingle()
+        ).data ||
+        (await supabaseAdmin.from("payout_requests").select("id, teacher_id").eq("id", id).maybeSingle()).data
       : null);
   if (!rowSafe) return NextResponse.json({ error: "Brak zgłoszenia." }, { status: 404 });
 
   if (status === "done") {
     const { owed } = await teacherCashflow(supabaseAdmin);
-    const pay = parsePayoutNoteUsd((rowSafe as { note?: string }).note) || owed.get(rowSafe.teacher_id) || 0;
-    const withNote = await supabaseAdmin
-      .from("payout_requests")
-      .update({ status: "done", note: `paid:${roundUsd(pay)}` })
-      .eq("id", id);
-    if (withNote.error && isMissingNoteColumn(withNote.error.message)) {
-      const { error } = await supabaseAdmin.from("payout_requests").update({ status: "done" }).eq("id", id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    } else if (withNote.error) {
-      return NextResponse.json({ error: withNote.error.message }, { status: 500 });
+    const pay =
+      parsePayoutNoteUsd((rowSafe as { note?: string }).note) ||
+      Number((rowSafe as { amount?: number }).amount) ||
+      owed.get(rowSafe.teacher_id) ||
+      0;
+    const at = new Date().toISOString();
+    const note = paidNote(pay, at);
+    const tries = [
+      { status: "done" as const, note, completed_at: at },
+      { status: "done" as const, note },
+      { status: "done" as const, completed_at: at },
+      { status: "done" as const },
+    ];
+    let lastErr: string | null = null;
+    for (const patch of tries) {
+      const { error } = await supabaseAdmin.from("payout_requests").update(patch).eq("id", id);
+      if (!error) {
+        lastErr = null;
+        break;
+      }
+      lastErr = error.message;
+      console.error("payout done:", error.message);
     }
+    if (lastErr) return NextResponse.json({ error: lastErr }, { status: 500 });
   } else {
     const { error } = await supabaseAdmin.from("payout_requests").update({ status }).eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

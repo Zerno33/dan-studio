@@ -366,6 +366,7 @@ export default function PromptEngine() {
     payoutPending: boolean;
     payoutStatus?: "pending" | "in_transit" | null;
     payoutRequestUsd?: number;
+    payoutHistory?: { id: string; usd: number; paidAt: string | null }[];
   } | null>(null);
   const [payoutBusy, setPayoutBusy] = useState(false);
   const [payoutMsg, setPayoutMsg] = useState("");
@@ -1350,6 +1351,35 @@ export default function PromptEngine() {
               {payoutMsg && !teacherStats?.payoutPending && (
                 <div style={{ fontSize: 11, color: T.muted, marginTop: 8, lineHeight: 1.5 }}>{payoutMsg}</div>
               )}
+            </div>
+            <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.muted, marginBottom: 12 }}>HISTORIA WYPŁAT</div>
+              {!(teacherStats?.payoutHistory || []).length && (
+                <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>Tu widać datę i kwotę, gdy przelew jest zakończony.</p>
+              )}
+              {(teacherStats?.payoutHistory || []).map((h) => {
+                const when = h.paidAt ? new Date(h.paidAt) : null;
+                const dateLabel =
+                  when && !Number.isNaN(when.getTime())
+                    ? when.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" })
+                    : "—";
+                return (
+                  <div
+                    key={h.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      fontSize: 12,
+                      padding: "8px 0",
+                      borderBottom: `1px solid ${T.line}`,
+                    }}
+                  >
+                    <span style={{ color: T.muted }}>{dateLabel}</span>
+                    <span>${Number(h.usd).toFixed(2)} USD</span>
+                  </div>
+                );
+              })}
             </div>
             {(teacherStats?.referrals || []).map((r) => (
               <div

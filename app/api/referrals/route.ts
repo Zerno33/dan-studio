@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getSupabaseAdmin } from "@/lib/auth";
 import { teacherCashflow } from "@/lib/teacher-cashflow";
-import { isMissingNoteColumn } from "@/lib/payout-note";
+import { isMissingNoteColumn, parsePayoutNoteUsd, parsePaidAt, roundUsd } from "@/lib/payout-note";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +104,37 @@ export async function GET(req: NextRequest) {
   }
   const pending = openRows?.[0] || null;
 
+  const historySelects = [
+    "id, status, amount, note, completed_at",
+    "id, status, amount, note",
+    "id, status, amount",
+    "id, status, note",
+    "id, status",
+  ];
+  let doneRows: {
+    id: string;
+    status?: string;
+    amount?: number | null;
+    note?: string | null;
+    completed_at?: string | null;
+  }[] = [];
+  for (const sel of historySelects) {
+    const hist = await supabaseAdmin
+      .from("payout_requests")
+      .select(sel)
+      .eq("teacher_id", user.id)
+      .eq("status", "done");
+    if (!hist.error) {
+      doneRows = hist.data || [];
+      break;
+    }
+  }
+  const payoutHistory = doneRows.map((p) => ({
+    id: p.id,
+    usd: roundUsd(parsePayoutNoteUsd(p.note) || Number(p.amount) || 0),
+    paidAt: parsePaidAt(p.note, p.completed_at || null),
+  }));
+
   const { owed } = await teacherCashflow(supabaseAdmin);
   const payoutDueUsd = owed.get(user.id) || 0;
 
@@ -118,6 +149,7 @@ export async function GET(req: NextRequest) {
     payoutPending: Boolean(pending?.id),
     payoutStatus: pending?.status === "in_transit" ? "in_transit" : pending?.id ? "pending" : null,
     payoutRequestUsd: pending?.amount != null ? Number(pending.amount) : payoutDueUsd,
+    payoutHistory,
   });
 }
 
