@@ -12,24 +12,34 @@ import { teacherCashflow } from "@/lib/teacher-cashflow";
 export const dynamic = "force-dynamic";
 
 async function listPayoutRows(supabaseAdmin: ReturnType<typeof getSupabaseAdmin>) {
-  const selects = [
-    "id, teacher_id, status, created_at, note, amount",
-    "id, teacher_id, status, created_at, amount",
-    "id, teacher_id, status, created_at, note",
-    "id, teacher_id, status, created_at",
+  const attempts: { sel: string; order: string | null }[] = [
+    { sel: "id, teacher_id, status, created_at, note, amount", order: "created_at" },
+    { sel: "id, teacher_id, status, created_at, amount", order: "created_at" },
+    { sel: "id, teacher_id, status, note, amount", order: null },
+    { sel: "id, teacher_id, status, amount", order: null },
+    { sel: "id, teacher_id, status, note", order: null },
+    { sel: "id, teacher_id, status", order: null },
   ];
   let lastError: string | null = null;
-  for (const sel of selects) {
-    const res = await supabaseAdmin
-      .from("payout_requests")
-      .select(sel)
-      .order("created_at", { ascending: false })
-      .limit(80);
+  for (const { sel, order } of attempts) {
+    let q = supabaseAdmin.from("payout_requests").select(sel).limit(80);
+    if (order) q = q.order(order, { ascending: false });
+    const res = await q;
     if (!res.error) return { data: res.data || [], error: null as string | null };
     lastError = res.error.message;
     console.error("payouts list:", sel, res.error.message);
   }
-  return { data: [] as { id: string; teacher_id: string; status?: string; created_at?: string; note?: string | null; amount?: number | null }[], error: lastError };
+  return {
+    data: [] as {
+      id: string;
+      teacher_id: string;
+      status?: string;
+      created_at?: string;
+      note?: string | null;
+      amount?: number | null;
+    }[],
+    error: lastError,
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -52,7 +62,7 @@ export async function GET(req: NextRequest) {
       id: p.id,
       teacher_id: p.teacher_id,
       status,
-      created_at: p.created_at,
+      created_at: "created_at" in p ? (p as { created_at?: string }).created_at : undefined,
       email: byId.get(p.teacher_id)?.email || "—",
       referralCode: byId.get(p.teacher_id)?.referral_code || null,
       earnedUsd: roundUsd(earned.get(p.teacher_id) || 0),
