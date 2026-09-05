@@ -84,12 +84,24 @@ export async function GET(req: NextRequest) {
   }));
   const referrals = [...fromRows, ...extras];
 
-  const { data: openRows } = await supabaseAdmin
+  let openRows: { id: string; status?: string; amount?: number | null }[] | null = null;
+  const openTry = await supabaseAdmin
     .from("payout_requests")
-    .select("id")
+    .select("id, status, amount")
     .eq("teacher_id", user.id)
     .in("status", ["pending", "in_transit"])
     .limit(1);
+  if (openTry.error) {
+    const fallback = await supabaseAdmin
+      .from("payout_requests")
+      .select("id, status")
+      .eq("teacher_id", user.id)
+      .in("status", ["pending", "in_transit"])
+      .limit(1);
+    openRows = fallback.data;
+  } else {
+    openRows = openTry.data;
+  }
   const pending = openRows?.[0] || null;
 
   const { owed } = await teacherCashflow(supabaseAdmin);
@@ -104,6 +116,8 @@ export async function GET(req: NextRequest) {
     commissionTotal,
     payoutDueUsd,
     payoutPending: Boolean(pending?.id),
+    payoutStatus: pending?.status === "in_transit" ? "in_transit" : pending?.id ? "pending" : null,
+    payoutRequestUsd: pending?.amount != null ? Number(pending.amount) : payoutDueUsd,
   });
 }
 
@@ -138,9 +152,13 @@ export async function POST(req: NextRequest) {
     const retry = await supabaseAdmin
       .from("payout_requests")
       .insert({ teacher_id: user.id, status: "pending", amount: due });
-    if (retry.error) return NextResponse.json({ error: retry.error.message }, { status: 500 });
+    if (retry.error) {
+      console.error("payout insert:", retry.error.message);
+      return NextResponse.json({ error: "Nie udało się zgłosić wypłaty." }, { status: 500 });
+    }
   } else if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("payout insert:", error.message);
+    return NextResponse.json({ error: "Nie udało się zgłosić wypłaty." }, { status: 500 });
   }
   return NextResponse.json({ ok: true, amount: due });
 }

@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, getSupabaseAdmin } from "@/lib/auth";
+import { requireUser, getSupabaseAdmin, adminEmails } from "@/lib/auth";
 import { linkReferralRow, findTeacherByCode, referredByFromAuthUser } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
-
-function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 const STARTER = Math.max(0, Number(process.env.STARTER_CREDITS || 50));
 

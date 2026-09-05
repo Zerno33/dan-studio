@@ -150,7 +150,7 @@ async function authFetch(path: string, init: RequestInit = {}) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 413) {
-      throw new Error("Za dużo danych (HTTP 413). Na N1 daj mniej zdjęć albo mniejsze pliki — Vercel ucina request powyżej ~4 MB.");
+      throw new Error("Za duże zdjęcia na jeden strzał. Daj mniej plików albo mniejsze rozdzielczości.");
     }
     throw new Error(json.error || `HTTP ${res.status}`);
   }
@@ -364,12 +364,15 @@ export default function PromptEngine() {
     commissionTotal: number;
     payoutDueUsd?: number;
     payoutPending: boolean;
+    payoutStatus?: "pending" | "in_transit" | null;
+    payoutRequestUsd?: number;
   } | null>(null);
   const [payoutBusy, setPayoutBusy] = useState(false);
   const [payoutMsg, setPayoutMsg] = useState("");
   const [payouts, setPayouts] = useState<
     {
       id: string;
+      teacher_id?: string;
       email: string;
       status: string;
       created_at: string;
@@ -379,6 +382,7 @@ export default function PromptEngine() {
       paidUsd?: number;
     }[]
   >([]);
+  const [payoutLoadErr, setPayoutLoadErr] = useState("");
   const [payoutCashflow, setPayoutCashflow] = useState<{
     owedTotalUsd: number;
     pendingCount: number;
@@ -466,6 +470,7 @@ export default function PromptEngine() {
         if (!list.length) setLoadErr("Brak systemów w bazie (systems_public).");
         const fol = await authFetch("/api/folders");
         setFolders(fol.folders || []);
+        if (me.user.isAdmin) await loadAdminShell();
       } catch (e: any) {
         if (String(e.message).includes("401") || String(e.message).includes("autoryz")) {
           window.location.href = "/login";
@@ -566,8 +571,8 @@ export default function PromptEngine() {
       authFetch("/api/admin/users"),
       authFetch("/api/admin/cost-summary"),
       authFetch("/api/admin/payouts").catch((e: unknown) => ({
-        payouts: [],
-        cashflow: { owedTotalUsd: 0, pendingCount: 0 },
+        payouts: [] as typeof payouts,
+        cashflow: null,
         error: e instanceof Error ? e.message : "Nie wczytano wypłat.",
       })),
       authFetch("/api/admin/ratings-summary").catch(() => ({ summary: {} })),
@@ -577,6 +582,7 @@ export default function PromptEngine() {
     setCostSummary(cost);
     setPayouts(pay.payouts || []);
     setPayoutCashflow(pay.cashflow || users.cashflow || null);
+    setPayoutLoadErr(pay.listError || pay.error || "");
     setRatingsSummary(ratings.summary || {});
     setEditId(null);
     setEditPrompt("");
@@ -814,7 +820,9 @@ export default function PromptEngine() {
                 if (t === "admin") await loadAdminShell();
               }}
             >
-              {t.toUpperCase()}
+              {t === "admin" && payouts.filter((p) => p.status !== "done").length
+                ? `ADMIN · ${payouts.filter((p) => p.status !== "done").length}`
+                : t.toUpperCase()}
             </Chip>
           ))}
           <span
@@ -1277,8 +1285,33 @@ export default function PromptEngine() {
                 <br />
                 Do wypłaty: ${Number(teacherStats?.payoutDueUsd ?? 0).toFixed(2)} USD
                 <br />
-                20% wpłaty poleconego ($0.60 z $3). Polar nie ma — zgłoszenie idzie do ADMIN (tickety na dole).
+                Dostajesz 20% od doładowań osób z Twojego linku.
               </p>
+              {teacherStats?.payoutPending && (
+                <div style={{ margin: "12px 0 4px" }}>
+                  <div style={{ fontSize: 11, color: T.text, marginBottom: 8 }}>
+                    {teacherStats.payoutStatus === "in_transit"
+                      ? "Przelew w realizacji"
+                      : "Wypłata zgłoszona — czekamy na przelew"}
+                    {teacherStats.payoutRequestUsd != null
+                      ? ` · $${Number(teacherStats.payoutRequestUsd).toFixed(2)}`
+                      : ""}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, height: 6 }}>
+                    <div style={{ flex: 1, background: T.red }} />
+                    <div
+                      style={{
+                        flex: 1,
+                        background: teacherStats.payoutStatus === "in_transit" ? T.red : T.line2,
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: T.muted, marginTop: 4 }}>
+                    <span>Zgłoszone</span>
+                    <span>W realizacji</span>
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 style={{ ...ghostBtn, marginTop: 12, marginRight: 8 }}
@@ -1292,26 +1325,29 @@ export default function PromptEngine() {
               <button
                 type="button"
                 style={ghostBtn}
-                disabled={teacherStats?.payoutPending || payoutBusy}
+                disabled={teacherStats?.payoutPending || payoutBusy || !(Number(teacherStats?.payoutDueUsd) > 0)}
                 onClick={async () => {
                   setPayoutBusy(true);
                   setPayoutMsg("");
                   try {
-                    const json = await authFetch("/api/referrals", { method: "POST" });
-                    setPayoutMsg(
-                      `Wysłane $${Number(json.amount ?? teacherStats?.payoutDueUsd ?? 0).toFixed(2)} — ticket w ADMIN na dole.`
-                    );
+                    await authFetch("/api/referrals", { method: "POST" });
+                    setPayoutMsg("Zgłoszenie przyjęte.");
                     await loadTeacher();
                   } catch (e: unknown) {
-                    setPayoutMsg(e instanceof Error ? e.message : "Nie wysłano zgłoszenia.");
+                    const raw = e instanceof Error ? e.message : "Nie wysłano zgłoszenia.";
+                    setPayoutMsg(
+                      /note|amount|schema|column|null value/i.test(raw)
+                        ? "Nie udało się zgłosić wypłaty. Spróbuj za chwilę."
+                        : raw
+                    );
                   } finally {
                     setPayoutBusy(false);
                   }
                 }}
               >
-                {payoutBusy ? "WYSYŁAM…" : teacherStats?.payoutPending ? "CZEKA NA WYPŁATĘ" : "ZLEĆ WYPŁATĘ"}
+                {payoutBusy ? "WYSYŁAM…" : teacherStats?.payoutPending ? "WYPŁATA W TOKU" : "ZLEĆ WYPŁATĘ"}
               </button>
-              {payoutMsg && (
+              {payoutMsg && !teacherStats?.payoutPending && (
                 <div style={{ fontSize: 11, color: T.muted, marginTop: 8, lineHeight: 1.5 }}>{payoutMsg}</div>
               )}
             </div>
@@ -1338,7 +1374,82 @@ export default function PromptEngine() {
 
         {tab === "admin" && isAdmin && (
           <section>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>USERZY</h2>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>WYPŁATY</h2>
+            <div style={{ fontSize: 16, margin: "8px 0 6px", color: T.green }}>
+              ${Number(payoutCashflow?.owedTotalUsd ?? 0).toFixed(2)} USD winne łącznie
+            </div>
+            <p style={{ fontSize: 11, color: T.muted, marginBottom: 12, lineHeight: 1.6 }}>
+              Ticket od nauczyciela (ZLEĆ WYPŁATĘ). Status: pending → w drodze → zakończono. To nie jest zakładka NAUCZYCIEL —
+              tam widać tylko Twoich poleconych.
+            </p>
+            {payoutLoadErr && (
+              <p style={{ fontSize: 11, color: T.red, marginBottom: 12 }}>{payoutLoadErr}</p>
+            )}
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>TICKETY</h2>
+            {payouts.filter((p) => p.status !== "done").length === 0 && (
+              <p style={{ color: T.muted, fontSize: 11, marginBottom: 16 }}>Brak otwartych zgłoszeń.</p>
+            )}
+            {payouts
+              .filter((p) => p.status !== "done")
+              .map((p) => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    alignItems: "center",
+                    border: `1px solid ${T.line}`,
+                    background: T.panel,
+                    padding: 10,
+                    marginBottom: 8,
+                    fontSize: 12,
+                  }}
+                >
+                  <span>{p.email}</span>
+                  <span style={{ color: T.green }}>${Number(p.requestedUsd || p.owedUsd || 0).toFixed(2)}</span>
+                  <select
+                    value={p.status === "in_transit" ? "in_transit" : p.status === "done" ? "done" : "pending"}
+                    onChange={async (e) => {
+                      await authFetch("/api/admin/payouts", {
+                        method: "POST",
+                        body: JSON.stringify({ id: p.id, status: e.target.value }),
+                      });
+                      await loadAdminShell();
+                    }}
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 11,
+                      background: T.bg,
+                      color: T.text,
+                      border: `1px solid ${T.line2}`,
+                      padding: "6px 8px",
+                    }}
+                  >
+                    <option value="pending">pending</option>
+                    <option value="in_transit">w drodze</option>
+                    <option value="done">zakończono</option>
+                  </select>
+                </div>
+              ))}
+            {payouts.filter((p) => p.status === "done").length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, letterSpacing: "0.1em", color: T.muted, margin: "12px 0 8px" }}>ZAKOŃCZONE</div>
+                {payouts
+                  .filter((p) => p.status === "done")
+                  .map((p) => (
+                    <div
+                      key={p.id}
+                      style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: T.muted, padding: "4px 0" }}
+                    >
+                      <span>{p.email}</span>
+                      <span>${Number(p.requestedUsd || 0).toFixed(2)}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>USERZY</h2>
             <button type="button" style={{ ...ghostBtn, marginBottom: 10 }} onClick={() => setInviteOpen(true)}>
               ZAPROŚ MAILEM
             </button>
@@ -1360,6 +1471,12 @@ export default function PromptEngine() {
                 <span>{u.email}</span>
                 <span style={{ color: T.muted, fontSize: 10 }}>kod {u.referral_code || "—"}</span>
                 <span style={{ color: T.muted, fontSize: 10 }}>od {u.referred_by || "—"}</span>
+                {Number(u.teacherOwedUsd) > 0 && (
+                  <span style={{ color: T.green, fontSize: 10 }}>${Number(u.teacherOwedUsd).toFixed(2)} winne</span>
+                )}
+                {payouts.some((p) => p.teacher_id === u.id && p.status !== "done") && (
+                  <span style={{ color: T.red, fontSize: 10 }}>ticket</span>
+                )}
                 <button
                   type="button"
                   style={ghostBtn}
@@ -1508,76 +1625,6 @@ export default function PromptEngine() {
                 )}
               </article>
             ))}
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 36 }}>WYPŁATY ŁĄCZNIE</h2>
-            <div style={{ fontSize: 16, margin: "8px 0 6px", color: T.green }}>
-              ${Number(payoutCashflow?.owedTotalUsd ?? 0).toFixed(2)} USD
-            </div>
-            <div style={{ fontSize: 11, color: T.muted, marginBottom: 16, lineHeight: 1.6 }}>
-              Winne afiliantom (wyrobione − zakończone przelewy). Kojot klika ZLEĆ WYPŁATĘ → Ty robisz przelew → status: pending → w
-              drodze → zakończono.
-            </div>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>TICKETY</h2>
-            {payouts.filter((p) => p.status !== "done").length === 0 && (
-              <p style={{ color: T.muted, fontSize: 11 }}>Brak otwartych zgłoszeń. Ticket pojawia się po ZLEĆ WYPŁATĘ u nauczyciela (nie u Ciebie, jeśli masz $0 do wypłaty).</p>
-            )}
-            {payouts
-              .filter((p) => p.status !== "done")
-              .map((p) => (
-                <div
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    alignItems: "center",
-                    border: `1px solid ${T.line}`,
-                    padding: 8,
-                    marginBottom: 6,
-                    fontSize: 12,
-                  }}
-                >
-                  <span>{p.email}</span>
-                  <span style={{ color: T.muted }}>${Number(p.requestedUsd || p.owedUsd || 0).toFixed(2)}</span>
-                  <select
-                    value={p.status === "in_transit" ? "in_transit" : p.status === "done" ? "done" : "pending"}
-                    onChange={async (e) => {
-                      await authFetch("/api/admin/payouts", {
-                        method: "POST",
-                        body: JSON.stringify({ id: p.id, status: e.target.value }),
-                      });
-                      await loadAdminShell();
-                    }}
-                    style={{
-                      fontFamily: MONO,
-                      fontSize: 11,
-                      background: T.bg,
-                      color: T.text,
-                      border: `1px solid ${T.line2}`,
-                      padding: "6px 8px",
-                    }}
-                  >
-                    <option value="pending">pending</option>
-                    <option value="in_transit">w drodze</option>
-                    <option value="done">zakończono</option>
-                  </select>
-                </div>
-              ))}
-            {payouts.filter((p) => p.status === "done").length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 11, letterSpacing: "0.1em", color: T.muted, marginBottom: 8 }}>ZAKOŃCZONE</div>
-                {payouts
-                  .filter((p) => p.status === "done")
-                  .map((p) => (
-                    <div
-                      key={p.id}
-                      style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: T.muted, padding: "4px 0" }}
-                    >
-                      <span>{p.email}</span>
-                      <span>${Number(p.requestedUsd || 0).toFixed(2)}</span>
-                    </div>
-                  ))}
-              </div>
-            )}
           </section>
         )}
       </div>

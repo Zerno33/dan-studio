@@ -10,9 +10,20 @@ export function roundUsd(n: number): number {
   return Number(n.toFixed(2));
 }
 
-export function isMissingNoteColumn(message: string | undefined): boolean {
+export function isMissingColumn(message: string | undefined, column: string): boolean {
   const m = (message || "").toLowerCase();
-  return m.includes("note") && (m.includes("schema cache") || m.includes("column"));
+  return m.includes(column.toLowerCase()) && (m.includes("schema cache") || m.includes("column") || m.includes("does not exist"));
+}
+
+export function isMissingNoteColumn(message: string | undefined): boolean {
+  return isMissingColumn(message, "note");
+}
+
+export function normalizePayoutStatus(raw: unknown): PayoutStatus {
+  const s = String(raw || "").toLowerCase().replace(/-/g, "_");
+  if (s === "in_transit" || s === "processing" || s === "w_drodze") return "in_transit";
+  if (s === "done" || s === "paid" || s === "completed" || s === "closed") return "done";
+  return "pending";
 }
 
 export type PayoutStatus = "pending" | "in_transit" | "done";
