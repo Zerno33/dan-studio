@@ -3,6 +3,7 @@ import { requireAdmin, getSupabaseAdmin } from "@/lib/auth";
 import {
   parsePayoutNoteUsd,
   parsePayoutStatus,
+  parsePaidAt,
   paidNote,
   roundUsd,
   normalizePayoutStatus,
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 async function listPayoutRows(supabaseAdmin: ReturnType<typeof getSupabaseAdmin>) {
   const attempts: { sel: string; order: string | null }[] = [
+    { sel: "id, teacher_id, status, note, amount, completed_at", order: null },
     { sel: "id, teacher_id, status, created_at, note, amount", order: "created_at" },
     { sel: "id, teacher_id, status, created_at, amount", order: "created_at" },
     { sel: "id, teacher_id, status, note, amount", order: null },
@@ -63,6 +65,7 @@ export async function GET(req: NextRequest) {
       teacher_id: p.teacher_id,
       status,
       created_at: "created_at" in p ? (p as { created_at?: string }).created_at : undefined,
+      paidAt: parsePaidAt(p.note, "completed_at" in p ? (p as { completed_at?: string | null }).completed_at : null),
       email: byId.get(p.teacher_id)?.email || "—",
       referralCode: byId.get(p.teacher_id)?.referral_code || null,
       earnedUsd: roundUsd(earned.get(p.teacher_id) || 0),

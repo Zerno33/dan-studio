@@ -93,14 +93,23 @@ function pasteTargetIsField(target: EventTarget | null) {
   return Boolean(el.closest?.("textarea, input, [contenteditable='true']"));
 }
 
+function formatPaidWhen(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const when = new Date(iso);
+  if (Number.isNaN(when.getTime())) return "—";
+  return when.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
+}
+
 function StudioModal({
   title,
   children,
   onClose,
+  maxWidth = 420,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  maxWidth?: number;
 }) {
   return (
     <div
@@ -120,7 +129,7 @@ function StudioModal({
       <div
         style={{
           width: "100%",
-          maxWidth: 420,
+          maxWidth,
           background: T.panel,
           border: `1px solid ${T.line2}`,
           padding: 16,
@@ -381,6 +390,7 @@ export default function PromptEngine() {
       requestedUsd?: number;
       earnedUsd?: number;
       paidUsd?: number;
+      paidAt?: string | null;
     }[]
   >([]);
   const [payoutLoadErr, setPayoutLoadErr] = useState("");
@@ -425,6 +435,7 @@ export default function PromptEngine() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteCredits, setInviteCredits] = useState("50");
+  const [payoutHistoryOpen, setPayoutHistoryOpen] = useState(false);
 
   const current = systems.find((s) => s.slug === systemSlug);
   const isR1 = systemSlug === "r1";
@@ -781,6 +792,49 @@ export default function PromptEngine() {
               }}
             >
               WYŚLIJ
+            </button>
+          </div>
+        </StudioModal>
+      )}
+      {payoutHistoryOpen && (
+        <StudioModal title="HISTORIA WYPŁAT" onClose={() => setPayoutHistoryOpen(false)} maxWidth={560}>
+          <p style={{ fontSize: 11, color: T.muted, margin: "0 0 12px", lineHeight: 1.5 }}>
+            Data = moment kliknięcia zakończono. Kwota i nauczyciel.
+          </p>
+          <div style={{ display: "flex", fontSize: 10, color: T.muted, letterSpacing: "0.08em", marginBottom: 8, gap: 8 }}>
+            <span style={{ width: 140, flexShrink: 0 }}>KIEDY</span>
+            <span style={{ flex: 1 }}>DO KOGO</span>
+            <span style={{ width: 90, textAlign: "right" }}>ILE</span>
+          </div>
+          {payouts.filter((p) => p.status === "done").length === 0 && (
+            <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>Brak zakończonych wypłat.</p>
+          )}
+          {payouts
+            .filter((p) => p.status === "done")
+            .slice()
+            .sort((a, b) => String(b.paidAt || "").localeCompare(String(a.paidAt || "")))
+            .map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "baseline",
+                  fontSize: 12,
+                  padding: "8px 0",
+                  borderBottom: `1px solid ${T.line}`,
+                }}
+              >
+                <span style={{ width: 140, flexShrink: 0, color: T.muted }}>{formatPaidWhen(p.paidAt)}</span>
+                <span style={{ flex: 1, minWidth: 0, wordBreak: "break-all" }}>{p.email}</span>
+                <span style={{ width: 90, textAlign: "right", color: T.green }}>
+                  ${Number(p.requestedUsd || 0).toFixed(2)}
+                </span>
+              </div>
+            ))}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button type="button" style={ghostBtn} onClick={() => setPayoutHistoryOpen(false)}>
+              ZAMKNIJ
             </button>
           </div>
         </StudioModal>
@@ -1357,29 +1411,22 @@ export default function PromptEngine() {
               {!(teacherStats?.payoutHistory || []).length && (
                 <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>Tu widać datę i kwotę, gdy przelew jest zakończony.</p>
               )}
-              {(teacherStats?.payoutHistory || []).map((h) => {
-                const when = h.paidAt ? new Date(h.paidAt) : null;
-                const dateLabel =
-                  when && !Number.isNaN(when.getTime())
-                    ? when.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" })
-                    : "—";
-                return (
-                  <div
-                    key={h.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      fontSize: 12,
-                      padding: "8px 0",
-                      borderBottom: `1px solid ${T.line}`,
-                    }}
-                  >
-                    <span style={{ color: T.muted }}>{dateLabel}</span>
-                    <span>${Number(h.usd).toFixed(2)} USD</span>
-                  </div>
-                );
-              })}
+              {(teacherStats?.payoutHistory || []).map((h) => (
+                    <div
+                      key={h.id}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        fontSize: 12,
+                        padding: "8px 0",
+                        borderBottom: `1px solid ${T.line}`,
+                      }}
+                    >
+                      <span style={{ color: T.muted }}>{formatPaidWhen(h.paidAt)}</span>
+                      <span>${Number(h.usd).toFixed(2)} USD</span>
+                    </div>
+                  ))}
             </div>
             {(teacherStats?.referrals || []).map((r) => (
               <div
@@ -1409,9 +1456,11 @@ export default function PromptEngine() {
               ${Number(payoutCashflow?.owedTotalUsd ?? 0).toFixed(2)} USD winne łącznie
             </div>
             <p style={{ fontSize: 11, color: T.muted, marginBottom: 12, lineHeight: 1.6 }}>
-              Ticket od nauczyciela (ZLEĆ WYPŁATĘ). Status: pending → w drodze → zakończono. To nie jest zakładka NAUCZYCIEL —
-              tam widać tylko Twoich poleconych.
+              Ticket od nauczyciela (ZLEĆ WYPŁATĘ). Status: pending → w drodze → zakończono.
             </p>
+            <button type="button" style={{ ...ghostBtn, marginBottom: 16 }} onClick={() => setPayoutHistoryOpen(true)}>
+              HISTORIA WYPŁAT
+            </button>
             {payoutLoadErr && (
               <p style={{ fontSize: 11, color: T.red, marginBottom: 12 }}>{payoutLoadErr}</p>
             )}
@@ -1462,22 +1511,6 @@ export default function PromptEngine() {
                   </select>
                 </div>
               ))}
-            {payouts.filter((p) => p.status === "done").length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 11, letterSpacing: "0.1em", color: T.muted, margin: "12px 0 8px" }}>ZAKOŃCZONE</div>
-                {payouts
-                  .filter((p) => p.status === "done")
-                  .map((p) => (
-                    <div
-                      key={p.id}
-                      style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: T.muted, padding: "4px 0" }}
-                    >
-                      <span>{p.email}</span>
-                      <span>${Number(p.requestedUsd || 0).toFixed(2)}</span>
-                    </div>
-                  ))}
-              </div>
-            )}
 
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>USERZY</h2>
             <button type="button" style={{ ...ghostBtn, marginBottom: 10 }} onClick={() => setInviteOpen(true)}>
