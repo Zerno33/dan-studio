@@ -22,24 +22,26 @@ async function listPayoutRows(supabaseAdmin: ReturnType<typeof getSupabaseAdmin>
     { sel: "id, teacher_id, status, note", order: null },
     { sel: "id, teacher_id, status", order: null },
   ];
+  type PayoutListRow = {
+    id: string;
+    teacher_id: string;
+    status?: string;
+    created_at?: string;
+    note?: string | null;
+    amount?: number | null;
+    completed_at?: string | null;
+  };
   let lastError: string | null = null;
   for (const { sel, order } of attempts) {
-    let q = supabaseAdmin.from("payout_requests").select(sel).limit(80);
+    let q: any = supabaseAdmin.from("payout_requests").select(sel).limit(80);
     if (order) q = q.order(order, { ascending: false });
     const res = await q;
-    if (!res.error) return { data: res.data || [], error: null as string | null };
-    lastError = res.error.message;
+    if (!res.error) return { data: (res.data || []) as PayoutListRow[], error: null as string | null };
+    lastError = res.error.message as string;
     console.error("payouts list:", sel, res.error.message);
   }
   return {
-    data: [] as {
-      id: string;
-      teacher_id: string;
-      status?: string;
-      created_at?: string;
-      note?: string | null;
-      amount?: number | null;
-    }[],
+    data: [] as PayoutListRow[],
     error: lastError,
   };
 }

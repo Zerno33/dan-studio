@@ -119,11 +119,11 @@ export async function GET(req: NextRequest) {
     completed_at?: string | null;
   }[] = [];
   for (const sel of historySelects) {
-    const hist = await supabaseAdmin
+    const hist = (await supabaseAdmin
       .from("payout_requests")
       .select(sel)
       .eq("teacher_id", user.id)
-      .eq("status", "done");
+      .eq("status", "done")) as { data: typeof doneRows | null; error: { message: string } | null };
     if (!hist.error) {
       doneRows = hist.data || [];
       break;
