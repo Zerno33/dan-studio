@@ -379,18 +379,19 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
     const shots = ["/idle/r1-1.jpg", "/idle/r1-2.jpg", "/idle/r1-3.jpg"] as const;
     return (
       <div className="peIdle peIdleR1" aria-hidden>
-        <IdlePlate live="/idle/r1-0.jpg" />
-        <span className="peIdleFlow" />
-        <div className="peIdleR1Tree">
-          {shots.map((src) => (
-            <div key={src} className="peIdleR1Row">
-              <IdleJobCard n="R1" />
-              <span className="peIdleFlow" />
-              <figure className="peIdleVar">
-                <img src={src} alt="" />
-              </figure>
-            </div>
-          ))}
+        <div className="peIdleR1Board">
+          <IdlePlate live="/idle/r1-src.jpg" ghost="/idle/r1-0-mask.jpg" />
+          <div className="peIdleR1Tree">
+            {shots.map((src) => (
+              <div key={src} className="peIdleR1Row">
+                <IdleJobCard n="R1" />
+                <span className="peIdleFlow" />
+                <figure className="peIdleVar">
+                  <img src={src} alt="" />
+                </figure>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
