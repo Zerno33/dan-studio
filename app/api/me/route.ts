@@ -4,7 +4,10 @@ import { linkReferralRow, findTeacherByCode, referredByFromAuthUser } from "@/li
 
 export const dynamic = "force-dynamic";
 
-const STARTER = Math.max(0, Number(process.env.STARTER_CREDITS || 10));
+const STARTER = Math.max(
+  0,
+  Math.min(10, Number(process.env.STARTER_CREDITS ?? 10) || 10)
+);
 
 export async function GET(req: NextRequest) {
   const user = await requireUser(req);
