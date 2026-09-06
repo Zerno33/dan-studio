@@ -364,47 +364,33 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
   if (system === "s1") {
     return (
       <div className="peIdle peIdleS1" aria-hidden>
-        <div className="peIdlePlate peIdlePlate--look">
-          <img src="/idle/r1-0.jpg" alt="" className="peIdleLive" />
-          <span className="peIdleGradeWash" />
-        </div>
-        <div className="peIdleTokens">
+        <IdlePlate live="/idle/r1-0.jpg" />
+        <div className="peIdleLock">
           <span className="peIdleSwatch" />
           <span className="peIdleSwatch" />
           <span className="peIdleSwatch" />
-          <span className="peIdleToken">light</span>
-          <span className="peIdleToken">cast</span>
-          <span className="peIdleToken">grain</span>
         </div>
         <span className="peIdleFlow" />
-        <IdleJobCard n="01" tag="look" />
+        <IdleJobCard n="S1" delay="0.55s" />
       </div>
     );
   }
   if (system === "r1") {
+    const shots = ["/idle/r1-1.jpg", "/idle/r1-2.jpg", "/idle/r1-3.jpg"] as const;
     return (
       <div className="peIdle peIdleR1" aria-hidden>
         <IdlePlate live="/idle/r1-0.jpg" />
         <span className="peIdleFlow" />
-        <div className="peIdleR1Cols">
-          <div className="peIdleR1Pair">
-            <IdleJobCard n="R1" delay="0.2s" />
-            <figure className="peIdleVar">
-              <img src="/idle/r1-1.jpg" alt="" />
-            </figure>
-          </div>
-          <div className="peIdleR1Pair">
-            <IdleJobCard n="R1" delay="0.45s" />
-            <figure className="peIdleVar">
-              <img src="/idle/r1-2.jpg" alt="" />
-            </figure>
-          </div>
-          <div className="peIdleR1Pair">
-            <IdleJobCard n="R1" delay="0.7s" />
-            <figure className="peIdleVar">
-              <img src="/idle/r1-3.jpg" alt="" />
-            </figure>
-          </div>
+        <div className="peIdleR1Tree">
+          {shots.map((src) => (
+            <div key={src} className="peIdleR1Row">
+              <IdleJobCard n="R1" />
+              <span className="peIdleFlow" />
+              <figure className="peIdleVar">
+                <img src={src} alt="" />
+              </figure>
+            </div>
+          ))}
         </div>
       </div>
     );
