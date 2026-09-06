@@ -1,0 +1,17 @@
+---
+description: Gałęzie dev vs main — vibecoding bez rozwalania produkcji
+alwaysApply: true
+---
+
+# Gałęzie
+
+- **`dev`** — jedyna gałąź do codziennej pracy i Cloud Agentów. Tu powstaje wersja do klikania i testów.
+- **`main`** — oficjalna, zaakceptowana apka. Nie commituj bezpośrednio na `main`.
+
+## Jak pracować
+
+1. Start agenta / checkout z `origin/dev` (nie z `main`, chyba że zadanie dotyczy tylko `main`).
+2. Feature branch od `dev`. Pull request **do `dev`**.
+3. Po akceptacji produktowej: osobny PR **`dev` → `main`**. Tytuł w stylu `Release: …`.
+
+Nie otwieraj feature PR-ów do `main`. Nie mieszaj hotfixu produkcji z niedokończonym vibecodingiem na `dev`.
