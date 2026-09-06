@@ -158,6 +158,47 @@ function formatLedgerWhen(iso: string) {
   return when.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
 }
 
+function FolderGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M3 8.2A2.2 2.2 0 0 1 5.2 6H9l1.8 1.8H18.8A2.2 2.2 0 0 1 21 10v7.8A2.2 2.2 0 0 1 18.8 20H5.2A2.2 2.2 0 0 1 3 17.8V8.2Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CopyButton({
+  text,
+  label = "KOPIUJ",
+  style,
+  className,
+}: {
+  text: string;
+  label?: string;
+  style?: CSSProperties;
+  className?: string;
+}) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button
+      type="button"
+      className={[className, ok ? "isCopied" : ""].filter(Boolean).join(" ")}
+      style={style}
+      onClick={async () => {
+        await navigator.clipboard.writeText(text);
+        setOk(true);
+        window.setTimeout(() => setOk(false), 1600);
+      }}
+    >
+      {ok ? "SKOPIOWANO" : label}
+    </button>
+  );
+}
+
 function StudioModal({
   title,
   children,
@@ -172,8 +213,11 @@ function StudioModal({
   return (
     <div role="dialog" className="peModalScrim" onClick={onClose}>
       <div className="peModal" style={{ maxWidth }} onClick={(e) => e.stopPropagation()}>
-        <div className="peLabel" style={{ color: T.red, marginBottom: 12 }}>
-          {title}
+        <div className="peModalHead">
+          <div className="peLabel">{title}</div>
+          <button type="button" className="peModalClose" aria-label="Zamknij" onClick={onClose}>
+            ×
+          </button>
         </div>
         {children}
       </div>
@@ -294,9 +338,19 @@ function IdlePlate({
   );
 }
 
-function IdleJobCard({ n, tag, delay = "0s" }: { n: string; tag?: string; delay?: string }) {
+function IdleJobCard({
+  n,
+  tag,
+  delay = "0s",
+  className = "",
+}: {
+  n: string;
+  tag?: string;
+  delay?: string;
+  className?: string;
+}) {
   return (
-    <div className="peIdleJob" style={{ animationDelay: delay }}>
+    <div className={`peIdleJob${className ? ` ${className}` : ""}`} style={{ animationDelay: delay }}>
       <div className="peIdleJobHead">
         <span>{n}</span>
         {tag ? <span className="peIdleTag">{tag}</span> : null}
@@ -308,6 +362,13 @@ function IdleJobCard({ n, tag, delay = "0s" }: { n: string; tag?: string; delay?
     </div>
   );
 }
+
+const N1_IDLE_SCENES = [
+  { live: "/idle/n1-sofa.png", ghost: "/idle/n1-sofa-mask.png" },
+  { live: "/idle/n1-room.png", ghost: "/idle/n1-room-mask.png" },
+  { live: "/idle/n1-sup.png", ghost: "/idle/n1-sup-mask.png" },
+  { live: "/idle/n1-park.jpg", ghost: "/idle/n1-park-mask.png" },
+] as const;
 
 function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
   if (system === "s1") {
@@ -326,42 +387,41 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
           <span className="peIdleToken">grain</span>
         </div>
         <span className="peIdleFlow" />
-        <IdleJobCard n="01" tag="look" />
+        <IdleJobCard n="S1" tag="look" />
       </div>
     );
   }
   if (system === "r1") {
     return (
       <div className="peIdle peIdleR1" aria-hidden>
-        <IdlePlate live="/idle/r1-0.jpg" />
-        <span className="peIdleFlow" />
-        <div className="peIdleFan">
-          <figure className="peIdleVar">
-            <img src="/idle/r1-1.jpg" alt="" />
-            <figcaption>pose</figcaption>
-          </figure>
-          <figure className="peIdleVar">
-            <img src="/idle/r1-2.jpg" alt="" />
-            <figcaption>face</figcaption>
-          </figure>
-          <figure className="peIdleVar">
-            <img src="/idle/r1-3.jpg" alt="" />
-            <figcaption>cam</figcaption>
-          </figure>
+        <div className="peIdleR1Board">
+          <div className="peIdleR1Hero">
+            <IdlePlate live="/idle/r1-0.jpg" ghost="/idle/r1-0.jpg" />
+            <IdleJobCard n="R1" className="peIdleJob--onHero" />
+          </div>
+          <div className="peIdleFan">
+            <figure className="peIdleVar">
+              <img src="/idle/r1-1.jpg" alt="" />
+            </figure>
+            <figure className="peIdleVar">
+              <img src="/idle/r1-2.jpg" alt="" />
+            </figure>
+            <figure className="peIdleVar">
+              <img src="/idle/r1-3.jpg" alt="" />
+            </figure>
+          </div>
         </div>
       </div>
     );
   }
   return (
     <div className="peIdle peIdleN1" aria-hidden>
-      <div className="peIdleUnit">
-        <IdlePlate live="/idle/n1-kitchen.png" ghost="/idle/n1-kitchen-mask.png" />
-        <IdleJobCard n="01" delay="0.4s" />
-      </div>
-      <div className="peIdleUnit">
-        <IdlePlate live="/idle/n1-beach.jpg" ghost="/idle/n1-beach-mask.png" delay="-4.5s" />
-        <IdleJobCard n="02" delay="-4.1s" />
-      </div>
+      {N1_IDLE_SCENES.map((scene, i) => (
+        <div key={scene.live} className="peIdleSlide">
+          <IdlePlate live={scene.live} ghost={scene.ghost} delay={`${i * 10}s`} />
+          <IdleJobCard n="N1" delay={`${i * 10}s`} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -882,27 +942,18 @@ export default function PromptEngine() {
         <StudioModal title="NOWY FOLDER" onClose={() => setLibFolderOpen(false)}>
           <input
             autoFocus
+            className="peField"
             value={libFolderName}
             onChange={(e) => setLibFolderName(e.target.value)}
-            placeholder="Nazwa"
-            style={{
-              width: "100%",
-              fontFamily: MONO,
-              fontSize: 13,
-              background: T.bg,
-              color: T.text,
-              border: `1px solid ${T.line2}`,
-              padding: 10,
-              marginBottom: 12,
-            }}
+            placeholder="Nazwa folderu"
           />
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button type="button" style={ghostBtn} onClick={() => setLibFolderOpen(false)}>
-              ANULUJ
+          <div className="peModalActions">
+            <button type="button" className="peBtn" onClick={() => setLibFolderOpen(false)}>
+              Anuluj
             </button>
             <button
               type="button"
-              style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
+              className="peBtnPrimary"
               onClick={async () => {
                 const name = libFolderName.trim();
                 if (!name) return;
@@ -913,7 +964,7 @@ export default function PromptEngine() {
                 setActiveFolder(json.folder.id);
               }}
             >
-              ZAPISZ
+              Zapisz
             </button>
           </div>
         </StudioModal>
@@ -1413,9 +1464,7 @@ export default function PromptEngine() {
                         <div className="peFilmThumb peLibThumbEmpty" />
                       )}
                       <p className="peFilmText">{shot.prompt}</p>
-                      <button type="button" className="peBtn" style={{ width: "100%" }} onClick={() => navigator.clipboard.writeText(copyText)}>
-                        Kopiuj
-                      </button>
+                      <CopyButton text={copyText} className="peBtn" style={{ width: "100%" }} />
                     </article>
                   );
                 })}
@@ -1430,23 +1479,23 @@ export default function PromptEngine() {
             <aside className="peCard" style={{ padding: 16 }}>
               <div className="peLabel" style={{ padding: "6px 8px 12px" }}>FOLDERY</div>
               <Chip active={activeFolder === "all"} onClick={() => setActiveFolder("all")}>
-                WSZYSTKIE ({library.length})
+                <FolderGlyph /> WSZYSTKIE ({library.length})
               </Chip>
               <div style={{ height: 8 }} />
               <Chip active={activeFolder === "none"} onClick={() => setActiveFolder("none")}>
-                BEZ FOLDERU
+                <FolderGlyph /> BEZ FOLDERU
               </Chip>
               <div style={{ height: 8 }} />
               {folders.map((f) => (
                 <div key={f.id} style={{ marginBottom: 8 }}>
                   <Chip active={activeFolder === f.id} onClick={() => setActiveFolder(f.id)}>
-                    {f.name}
+                    <FolderGlyph /> {f.name}
                   </Chip>
                 </div>
               ))}
               <div style={{ height: 8 }} />
               <Chip active={false} onClick={() => setLibFolderOpen(true)}>
-                + FOLDER
+                <FolderGlyph /> + FOLDER
               </Chip>
             </aside>
             <div style={{ padding: "0 4px 24px", minWidth: 0 }}>
@@ -1516,9 +1565,7 @@ export default function PromptEngine() {
                         <div style={{ fontSize: 12, color: T.muted }}>
                           {p.created_at} · {p.word_count} słów
                         </div>
-                        <button type="button" style={ghostBtn} onClick={() => navigator.clipboard.writeText(copyText)}>
-                          KOPIUJ
-                        </button>
+                        <CopyButton text={copyText} style={ghostBtn} />
                         <button
                           type="button"
                           style={ghostBtn}
@@ -1671,16 +1718,11 @@ export default function PromptEngine() {
                   </div>
                 </div>
               )}
-              <button
-                type="button"
+              <CopyButton
+                text={`${typeof window !== "undefined" ? window.location.origin : ""}/login?ref=${encodeURIComponent(referralCode)}`}
+                label="KOPIUJ LINK"
                 style={{ ...ghostBtn, marginTop: 12, marginRight: 8 }}
-                onClick={() => {
-                  const url = `${window.location.origin}/login?ref=${encodeURIComponent(referralCode)}`;
-                  navigator.clipboard.writeText(url);
-                }}
-              >
-                KOPIUJ LINK
-              </button>
+              />
               <button
                 type="button"
                 style={ghostBtn}
@@ -2104,34 +2146,25 @@ function ResultCard({
         <StudioModal title="NOWY FOLDER" onClose={() => !folderBusy && setFolderModal(false)}>
           <input
             autoFocus
+            className="peField"
             value={folderName}
             onChange={(e) => setFolderName(e.target.value)}
             placeholder="Nazwa folderu"
             onKeyDown={(e) => {
               if (e.key === "Enter") void createAndAssign();
             }}
-            style={{
-              width: "100%",
-              fontFamily: MONO,
-              fontSize: 13,
-              background: T.bg,
-              color: T.text,
-              border: `1px solid ${T.line2}`,
-              padding: 10,
-              marginBottom: 12,
-            }}
           />
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button type="button" style={ghostBtn} disabled={folderBusy} onClick={() => setFolderModal(false)}>
-              ANULUJ
+          <div className="peModalActions">
+            <button type="button" className="peBtn" disabled={folderBusy} onClick={() => setFolderModal(false)}>
+              Anuluj
             </button>
             <button
               type="button"
+              className="peBtnPrimary"
               disabled={folderBusy || !folderName.trim()}
               onClick={() => void createAndAssign()}
-              style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
             >
-              ZAPISZ
+              Zapisz
             </button>
           </div>
         </StudioModal>
@@ -2212,13 +2245,9 @@ function ResultCard({
               </option>
             ))}
           </select>
-          <button type="button" style={ghostBtn} onClick={() => navigator.clipboard.writeText(formatMode === "together" ? full : block.prompt)}>
-            KOPIUJ
-          </button>
+          <CopyButton text={formatMode === "together" ? full : block.prompt} style={ghostBtn} />
           {formatMode === "separate" && block.negative && (
-            <button type="button" style={ghostBtn} onClick={() => navigator.clipboard.writeText(block.negative)}>
-              KOPIUJ NEGATIVE
-            </button>
+            <CopyButton text={block.negative} label="KOPIUJ NEGATIVE" style={ghostBtn} />
           )}
             </>
           )}
