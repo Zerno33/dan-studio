@@ -401,8 +401,8 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
       {N1_IDLE_SCENES.map((scene, i) => (
         <div key={scene.live} className="peIdleSlide">
           <div className="peIdleUnit">
-            <IdlePlate live={scene.live} ghost={scene.ghost} delay={`${i * 9}s`} />
-            <IdleJobCard n="N1" delay={`${i * 9 + 0.4}s`} />
+            <IdlePlate live={scene.live} ghost={scene.ghost} delay={`${i * 8}s`} />
+            <IdleJobCard n="N1" delay={`${i * 8 + 0.4}s`} />
           </div>
         </div>
       ))}

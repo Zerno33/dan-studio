@@ -75,8 +75,22 @@ input, textarea, select, button { font-family: inherit; }
   22%, 70% { opacity: 1; transform: translateY(0); }
 }
 @keyframes peIdleSlide {
-  0%, 22% { opacity: 1; }
-  25%, 100% { opacity: 0; }
+  0% {
+    opacity: 0;
+    transform: translate(36%, 30%) rotate(-12deg);
+  }
+  8%, 17% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  27% {
+    opacity: 0;
+    transform: translate(-36%, -30%) rotate(12deg);
+  }
+  28%, 100% {
+    opacity: 0;
+    transform: translate(36%, 30%) rotate(-12deg);
+  }
 }
 @keyframes peIdleGrade {
   0%, 100% { filter: saturate(0.85) hue-rotate(0deg); }
@@ -87,29 +101,40 @@ input, textarea, select, button { font-family: inherit; }
   0%, 15%, 100% { opacity: 0.2; transform: translateY(6px) scale(0.92); }
   28%, 70% { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes peIdleR1Scan {
+  0%, 4% { transform: translateY(-120%); opacity: 0; }
+  10%, 22% { opacity: 0.9; }
+  30% { transform: translateY(120%); opacity: 0; }
+  100% { transform: translateY(120%); opacity: 0; }
+}
+@keyframes peIdleR1Depth {
+  0%, 6% { opacity: 0; }
+  14%, 28% { opacity: 1; }
+  38%, 100% { opacity: 0; }
+}
 @keyframes peIdleR1Prompt {
-  0%, 18% { opacity: 0; transform: translateX(-10px); }
-  28%, 90% { opacity: 1; transform: translateX(0); }
+  0%, 34% { opacity: 0; transform: translateX(-12px); }
+  44%, 90% { opacity: 1; transform: translateX(0); }
   96%, 100% { opacity: 0; }
 }
 @keyframes peIdleR1Shot {
-  0%, 52% { opacity: 0; transform: translateX(-8px) scale(0.92); }
-  62%, 90% { opacity: 1; transform: translateX(0) scale(1); }
+  0%, 60% { opacity: 0; transform: translateX(-10px) scale(0.92); }
+  70%, 90% { opacity: 1; transform: translateX(0) scale(1); }
   96%, 100% { opacity: 0; }
 }
 @keyframes peIdleR1Link {
-  0%, 52% { opacity: 0; }
-  62%, 90% { opacity: 0.7; }
+  0%, 60% { opacity: 0; }
+  70%, 90% { opacity: 0.7; }
   96%, 100% { opacity: 0; }
 }
 @keyframes peIdleR1Spine {
-  0%, 18% { opacity: 0; }
-  28%, 90% { opacity: 1; }
+  0%, 34% { opacity: 0; }
+  44%, 90% { opacity: 1; }
   96%, 100% { opacity: 0; }
 }
 @keyframes peIdleR1Zoom {
-  0%, 40% { transform: scale(1.22) translate(6%, 0); }
-  54%, 100% { transform: scale(1) translate(0, 0); }
+  0%, 52% { transform: scale(1.2) translate(5%, 0); }
+  64%, 100% { transform: scale(1) translate(0, 0); }
 }
 @keyframes peIdleSpawn {
   0%, 12% { opacity: 0; transform: translateX(-18px) scale(0.92); }
@@ -360,6 +385,7 @@ input, textarea, select, button { font-family: inherit; }
   width: min(100%, 760px);
   min-height: 430px;
   display: block;
+  overflow: hidden;
 }
 .peIdleSlide {
   position: absolute;
@@ -368,12 +394,12 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
   justify-content: center;
   opacity: 0;
-  animation: peIdleSlide 36s linear infinite;
+  animation: peIdleSlide 32s cubic-bezier(0.4, 0.05, 0.2, 1) infinite;
 }
 .peIdleSlide:nth-child(1) { animation-delay: 0s; }
-.peIdleSlide:nth-child(2) { animation-delay: 9s; }
-.peIdleSlide:nth-child(3) { animation-delay: 18s; }
-.peIdleSlide:nth-child(4) { animation-delay: 27s; }
+.peIdleSlide:nth-child(2) { animation-delay: 8s; }
+.peIdleSlide:nth-child(3) { animation-delay: 16s; }
+.peIdleSlide:nth-child(4) { animation-delay: 24s; }
 .peIdleUnit {
   display: flex;
   align-items: center;
@@ -477,7 +503,10 @@ input, textarea, select, button { font-family: inherit; }
   padding: 14px 16px 16px;
   animation: peIdleJobOn 9s ease-in-out infinite;
 }
-.peIdleN1 .peIdleLine { height: 5px; margin-bottom: 7px; }
+.peIdleN1 .peIdleGhost { animation-duration: 8s; }
+.peIdleN1 .peIdleScan { animation-duration: 8s; }
+.peIdleN1 .peIdleJob { animation-duration: 8s; }
+.peIdleN1 .peIdleLine { animation-duration: 8s; }
 .peIdleSwatch {
   width: 14px;
   height: 14px;
@@ -535,8 +564,8 @@ input, textarea, select, button { font-family: inherit; }
   width: 248px;
   height: 332px;
 }
-.peIdleR1 .peIdleGhost { animation-duration: 14s; }
-.peIdleR1 .peIdleScan { animation-duration: 14s; }
+.peIdleR1 .peIdleGhost { animation: peIdleR1Depth 14s ease-in-out infinite; }
+.peIdleR1 .peIdleScan { animation: peIdleR1Scan 14s ease-in-out infinite; }
 .peIdleR1Tree {
   position: relative;
   display: flex;
