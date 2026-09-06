@@ -39,11 +39,15 @@ export default function LoginPage() {
 
     let unsub: { unsubscribe: () => void } | undefined;
     (async () => {
-      const supabase = await getSupabaseBrowser();
-      const { data } = supabase.auth.onAuthStateChange((event) => {
-        if (event === "PASSWORD_RECOVERY") setRecovery(true);
-      });
-      unsub = data.subscription;
+      try {
+        const supabase = await getSupabaseBrowser();
+        const { data } = supabase.auth.onAuthStateChange((event) => {
+          if (event === "PASSWORD_RECOVERY") setRecovery(true);
+        });
+        unsub = data.subscription;
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Logowanie niedostępne.");
+      }
     })();
     return () => unsub?.unsubscribe();
   }, []);

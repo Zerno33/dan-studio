@@ -46,11 +46,21 @@ input, textarea, select, button { font-family: inherit; }
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes peDeck {
-  0%, 100% { transform: translate3d(-48px, 18px, 0) rotate(-7deg) scale(0.88); opacity: 0.38; z-index: 1; }
-  18%, 32% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); opacity: 1; z-index: 3; }
-  50%, 64% { transform: translate3d(48px, 12px, 0) rotate(7deg) scale(0.9); opacity: 0.5; z-index: 2; }
-  82% { transform: translate3d(-48px, 18px, 0) rotate(-7deg) scale(0.88); opacity: 0.38; z-index: 1; }
+@keyframes peDropIn {
+  from { opacity: 0; transform: translateY(-22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes peN1Fly {
+  0%, 100% { transform: translate(var(--ox), var(--oy)) scale(0.72); opacity: 0.45; }
+  50% { transform: translate(0, 0) scale(1); opacity: 0.95; }
+}
+@keyframes peS1Wash {
+  0%, 100% { transform: translateX(-110%); opacity: 0.15; }
+  50% { transform: translateX(10%); opacity: 0.55; }
+}
+@keyframes peR1Fan {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  50% { transform: translateX(var(--fx)) rotate(var(--fr)); }
 }
 
 .peApp {
@@ -169,15 +179,39 @@ input, textarea, select, button { font-family: inherit; }
 .peToolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
+  align-items: flex-end;
+  gap: 14px 18px;
   margin: 16px 16px 0;
-  padding: 12px 16px;
+  padding: 14px 16px 16px;
   border-radius: var(--pe-radius);
   background: var(--pe-panel);
   border: 1px solid var(--pe-line);
   backdrop-filter: blur(14px);
 }
+.peBarGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.peBarGroup .peLabel {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+.peBarRun {
+  margin-left: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding-left: 18px;
+  border-left: 1px solid var(--pe-line);
+  min-height: 52px;
+}
+.peBarCost {
+  font-size: 12px;
+  color: var(--pe-muted);
+  padding-bottom: 10px;
+}
+.peBarCost b { font-weight: 650; }
 
 .peSession {
   padding: 4px 16px 56px;
@@ -203,7 +237,8 @@ input, textarea, select, button { font-family: inherit; }
   display: grid;
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
   gap: 16px;
-  min-height: 62vh;
+  min-height: 58vh;
+  padding-top: 16px;
 }
 .peRail {
   display: flex;
@@ -260,37 +295,95 @@ input, textarea, select, button { font-family: inherit; }
   padding: 36px 24px 28px;
 }
 .peJobGrid > .peEmpty { grid-column: 1 / -1; }
-.peEmptyHint {
-  margin: 8px 0 0;
-  max-width: 280px;
-  color: var(--pe-muted);
-}
-.peStack {
+.peIdle {
   position: relative;
-  width: 240px;
-  height: 148px;
-  margin: 0 auto 8px;
-  perspective: 640px;
+  width: 220px;
+  height: 158px;
 }
-.peStackCard {
+.peIdleShot,
+.peIdleFrame,
+.peIdlePortrait,
+.peIdleClone {
   position: absolute;
-  inset: 18px 28px;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid var(--pe-line2);
-  background: linear-gradient(180deg, rgba(28, 28, 28, 0.95), rgba(14, 14, 14, 0.92));
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 12px 14px;
-  color: var(--pe-red);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  animation: peDeck 9s ease-in-out infinite;
+  background: linear-gradient(180deg, #1a1a1a, #101010);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
-.peStackCard:nth-child(1) { animation-delay: 0s; }
-.peStackCard:nth-child(2) { animation-delay: -3s; }
-.peStackCard:nth-child(3) { animation-delay: -6s; }
+.peIdleN1 .peIdleShot {
+  width: 54px;
+  height: 70px;
+  animation: peN1Fly 4.8s ease-in-out infinite;
+}
+.peIdleN1 .peIdleShot:nth-child(1) { --ox: -78px; --oy: -18px; left: 84px; top: 44px; animation-delay: 0s; }
+.peIdleN1 .peIdleShot:nth-child(2) { --ox: 82px; --oy: -10px; left: 84px; top: 44px; animation-delay: -1.6s; }
+.peIdleN1 .peIdleShot:nth-child(3) { --ox: 0px; --oy: 48px; left: 84px; top: 44px; animation-delay: -3.2s; }
+.peIdleN1 .peIdleFrame {
+  width: 92px;
+  height: 118px;
+  left: 64px;
+  top: 18px;
+  border-color: rgba(229, 21, 42, 0.45);
+  background: transparent;
+}
+.peIdleS1 .peIdlePortrait {
+  inset: 12px 58px;
+}
+.peIdleS1 .peIdleWash {
+  position: absolute;
+  inset: 12px 58px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, transparent, rgba(229, 21, 42, 0.55), transparent);
+  animation: peS1Wash 3.6s ease-in-out infinite;
+}
+.peIdleR1 .peIdleClone {
+  width: 72px;
+  height: 96px;
+  left: 74px;
+  top: 28px;
+  animation: peR1Fan 3.8s ease-in-out infinite;
+}
+.peIdleR1 .peIdleClone:nth-child(1) { --fx: -52px; --fr: -9deg; animation-delay: 0s; }
+.peIdleR1 .peIdleClone:nth-child(2) { --fx: 0px; --fr: 0deg; z-index: 2; animation-delay: -1.2s; }
+.peIdleR1 .peIdleClone:nth-child(3) { --fx: 52px; --fr: 9deg; animation-delay: -2.4s; }
+.peFilm {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 20px 0 8px;
+}
+.peFilmCard {
+  flex: 0 0 176px;
+  padding: 10px;
+  animation: peDropIn 0.45s ease both;
+}
+.peFilmThumb {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--pe-line2);
+  display: block;
+}
+.peFilmText {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--pe-muted);
+  max-height: 4.4em;
+  overflow: hidden;
+  margin: 8px 0;
+}
+.peLibBulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--pe-line);
+  border-radius: var(--pe-radius-sm);
+  background: rgba(18, 18, 18, 0.7);
+}
 .peDrop {
   display: flex;
   flex-wrap: wrap;
@@ -501,6 +594,7 @@ input, textarea, select, button { font-family: inherit; }
   .peWork { grid-template-columns: 1fr; min-height: auto; }
   .peTop { display: flex; flex-wrap: wrap; height: auto; }
   .peTopNav, .peTopUser { justify-self: unset; }
+  .peBarRun { margin-left: 0; border-left: none; padding-left: 0; width: 100%; justify-content: flex-end; }
 }
 @media (max-width: 860px) {
   .peKonto, .peLib { grid-template-columns: 1fr; }
@@ -513,10 +607,7 @@ input, textarea, select, button { font-family: inherit; }
   .peLoginForm { padding: 40px 24px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .peApp, .peJob, .peLibItem, .peBusyBar { animation: none; }
+  .peApp, .peJob, .peLibItem, .peBusyBar, .peFilmCard { animation: none; }
   .peBtnPrimary:not(:disabled) { animation: none; }
-  .peStackCard { animation: none; }
-  .peStackCard:nth-child(1) { transform: translate3d(-40px, 14px, 0) rotate(-6deg) scale(0.9); opacity: 0.5; }
-  .peStackCard:nth-child(2) { transform: none; opacity: 1; z-index: 3; }
-  .peStackCard:nth-child(3) { transform: translate3d(40px, 10px, 0) rotate(6deg) scale(0.92); opacity: 0.55; }
+  .peIdleShot, .peIdleWash, .peIdleClone { animation: none; }
 }

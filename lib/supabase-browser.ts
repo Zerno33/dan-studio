@@ -12,8 +12,13 @@ export async function getSupabaseBrowser(): Promise<SupabaseClient> {
       const res = await fetch("/api/public-config");
       const cfg = await res.json();
       if (!cfg.configured || !cfg.url || !cfg.anonKey) {
+        const local =
+          typeof window !== "undefined" &&
+          (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
         throw new Error(
-          "Logowanie niedostępne. Odśwież stronę. Jeśli wraca — daj znać adminowi."
+          local
+            ? "Lokalnie brak kluczy Supabase (.env.local to pusta kopia example). W terminalu: npx vercel env pull .env.local — potem npm.cmd run dev. Albo testuj na preview Vercel."
+            : "Logowanie niedostępne. Odśwież stronę. Jeśli wraca — daj znać adminowi."
         );
       }
       client = createClient(cfg.url, cfg.anonKey, {

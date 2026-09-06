@@ -6,7 +6,7 @@ import { calculateCreditCost } from "@/lib/credits";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { isModelRefusal } from "@/lib/refusal";
 
-type Tab = "konsola" | "konto" | "nauczyciel" | "admin";
+type Tab = "konsola" | "biblioteka" | "konto" | "nauczyciel" | "admin";
 type AdminView = "payouts" | "users" | "cost" | "systems" | "ratings";
 
 const ADMIN_VIEWS: { id: AdminView; l: string }[] = [
@@ -58,9 +58,9 @@ const R1_VARIANTS = [
 ];
 
 const LENGTHS = [
-  { id: "short" as const, l: "110–200" },
-  { id: "std" as const, l: "300–420" },
-  { id: "long" as const, l: "420–520" },
+  { id: "short" as const, l: "krótki  110–200" },
+  { id: "std" as const, l: "środek  300–420" },
+  { id: "long" as const, l: "długi  420–520" },
 ];
 
 const ERROR_TAGS = [
@@ -276,6 +276,34 @@ function imageToPreview(base64: string, mime: string): Promise<string | null> {
   });
 }
 
+function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
+  if (system === "s1") {
+    return (
+      <div className="peIdle peIdleS1" aria-hidden>
+        <span className="peIdlePortrait" />
+        <span className="peIdleWash" />
+      </div>
+    );
+  }
+  if (system === "r1") {
+    return (
+      <div className="peIdle peIdleR1" aria-hidden>
+        <span className="peIdleClone" />
+        <span className="peIdleClone" />
+        <span className="peIdleClone" />
+      </div>
+    );
+  }
+  return (
+    <div className="peIdle peIdleN1" aria-hidden>
+      <span className="peIdleShot" />
+      <span className="peIdleShot" />
+      <span className="peIdleShot" />
+      <span className="peIdleFrame" />
+    </div>
+  );
+}
+
 function Chip({
   children,
   active,
@@ -450,6 +478,10 @@ export default function PromptEngine() {
   const [blocks, setBlocks] = useState<
     { id?: string; prompt: string; negative: string; preview?: string | null; error?: string; pending?: boolean }[]
   >([]);
+  const [sessionFeed, setSessionFeed] = useState<
+    { key: string; preview?: string | null; prompt: string; negative: string }[]
+  >([]);
+  const [picked, setPicked] = useState<string[]>([]);
   const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
   const [library, setLibrary] = useState<any[]>([]);
   const [activeFolder, setActiveFolder] = useState("all");
@@ -521,7 +553,13 @@ export default function PromptEngine() {
         if (me.user.isAdmin) await loadAdminShell();
         await loadLibrary();
       } catch (e: any) {
-        if (String(e.message).includes("401") || String(e.message).includes("autoryz")) {
+        const msg = String(e.message || "");
+        if (
+          msg.includes("401") ||
+          msg.includes("autoryz") ||
+          msg.includes("Logowanie") ||
+          msg.includes("Lokalnie brak")
+        ) {
           window.location.href = "/login";
         } else setLoadErr(e.message || "Błąd ładowania.");
       }
@@ -616,6 +654,19 @@ export default function PromptEngine() {
               return next;
             });
             if (typeof json.creditsRemaining === "number") setCredits(json.creditsRemaining);
+            if (!refused && b?.prompt) {
+              setSessionFeed((prev) =>
+                [
+                  {
+                    key: String(b.id || `n1-${i}-${Date.now()}`),
+                    preview: slots[i].preview,
+                    prompt: b.prompt,
+                    negative: b.negative || "",
+                  },
+                  ...prev,
+                ].slice(0, 48)
+              );
+            }
           } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : "Błąd slotu.";
             setBlocks((prev) => {
@@ -642,14 +693,26 @@ export default function PromptEngine() {
             formatMode,
           }),
         });
-        setBlocks(
-          (json.blocks || []).map((b: { id?: string; prompt: string; negative: string }, i: number) => {
-            const preview = sourcePreviews[i] || sourcePreviews[0] || null;
-            if (isModelRefusal(b.prompt || "")) {
-              return { prompt: "", negative: "", preview, pending: false, error: b.prompt };
-            }
-            return { ...b, preview };
-          })
+        const mapped = (json.blocks || []).map((b: { id?: string; prompt: string; negative: string }, i: number) => {
+          const preview = sourcePreviews[i] || sourcePreviews[0] || null;
+          if (isModelRefusal(b.prompt || "")) {
+            return { prompt: "", negative: "", preview, pending: false, error: b.prompt };
+          }
+          return { ...b, preview };
+        });
+        setBlocks(mapped);
+        setSessionFeed((prev) =>
+          [
+            ...mapped
+              .filter((b: { prompt?: string; error?: string }) => b.prompt && !b.error)
+              .map((b: { id?: string; prompt: string; negative?: string; preview?: string | null }) => ({
+                key: String(b.id || `job-${Date.now()}`),
+                preview: b.preview,
+                prompt: b.prompt,
+                negative: b.negative || "",
+              })),
+            ...prev,
+          ].slice(0, 48)
         );
         if (typeof json.creditsRemaining === "number") setCredits(json.creditsRemaining);
       }
@@ -957,13 +1020,14 @@ export default function PromptEngine() {
         <span className="peTopBrand">PROMPT_ENGINE</span>
         <nav className="peTopNav">
           {(
-            ["konsola", "konto", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
+            ["konsola", "biblioteka", "konto", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
           ).map((t) => (
             <Chip
               key={t}
               active={tab === t}
               onClick={async () => {
                 setTab(t);
+                if (t === "biblioteka") await loadLibrary();
                 if (t === "nauczyciel") await loadTeacher();
                 if (t === "admin") await loadAdminShell();
                 if (t === "konto") await loadLedger();
@@ -971,7 +1035,9 @@ export default function PromptEngine() {
             >
               {t === "admin" && payouts.filter((p) => p.status !== "done").length
                 ? `ADMIN · ${payouts.filter((p) => p.status !== "done").length}`
-                : t.toUpperCase()}
+                : t === "biblioteka"
+                  ? "ASSETS"
+                  : t.toUpperCase()}
             </Chip>
           ))}
         </nav>
@@ -1006,10 +1072,10 @@ export default function PromptEngine() {
         {tab === "konsola" && (
           <>
             <div className="peToolbar">
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="peBarGroup">
                 <Label>SYSTEM</Label>
                 <Sel
-                  width={120}
+                  width={128}
                   value={systemSlug}
                   onChange={(v) => {
                     setSystemSlug(v as any);
@@ -1019,10 +1085,10 @@ export default function PromptEngine() {
                   options={systems.map((s) => ({ v: s.slug, l: `${s.icon || ""} ${s.label}` }))}
                 />
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="peBarGroup">
                 <Label>MODEL</Label>
                 <Sel
-                  width={150}
+                  width={168}
                   value={modelOverride || current?.model || ALLOWED_MODELS[0]}
                   onChange={setModelOverride}
                   options={MODEL_OPTIONS}
@@ -1030,20 +1096,20 @@ export default function PromptEngine() {
               </div>
               {isR1 && (
                 <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div className="peBarGroup">
                     <Label>WARIANT</Label>
                     <Sel
-                      width={180}
+                      width={200}
                       value={variant}
                       onChange={setVariant}
                       options={R1_VARIANTS.map((v) => ({ v: v.id, l: v.label }))}
                     />
                   </div>
                   {!isAnalyze && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div className="peBarGroup">
                       <Label>LICZBA</Label>
                       <Sel
-                        width={56}
+                        width={72}
                         value={String(count)}
                         onChange={(v) => setCount(Number(v))}
                         options={Array.from({ length: 10 }, (_, i) => ({ v: String(i + 1), l: String(i + 1) }))}
@@ -1053,56 +1119,48 @@ export default function PromptEngine() {
                 </>
               )}
               {systemSlug === "n1" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="peBarGroup">
                   <Label>WEJŚCIE</Label>
-                  <Chip active={mode === "img"} onClick={() => setMode("img")}>
-                    ZAŁĄCZNIKI
-                  </Chip>
-                  <Chip active={mode === "prompt"} onClick={() => setMode("prompt")}>
-                    PROMPT
-                  </Chip>
-                </div>
-              )}
-              {!isR1 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Label>DŁUGOŚĆ</Label>
                   <Sel
-                    width={90}
-                    value={lengthMode}
-                    onChange={(v) => setLengthMode(v as any)}
-                    options={LENGTHS.map((l) => ({ v: l.id, l: l.l }))}
+                    width={140}
+                    value={mode}
+                    onChange={(v) => setMode(v as "img" | "prompt")}
+                    options={[
+                      { v: "img", l: "załączniki" },
+                      { v: "prompt", l: "wklejony prompt" },
+                    ]}
                   />
                 </div>
               )}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {!isR1 && (
+                <div className="peBarGroup">
+                  <Label>DŁUGOŚĆ</Label>
+                  <Sel width={168} value={lengthMode} onChange={(v) => setLengthMode(v as any)} options={LENGTHS.map((l) => ({ v: l.id, l: l.l }))} />
+                </div>
+              )}
+              <div className="peBarGroup">
                 <Label>FORMAT</Label>
-                <Chip active={formatMode === "together"} onClick={() => setFormatMode("together")}>
-                  RAZEM
-                </Chip>
-                <Chip active={formatMode === "separate"} onClick={() => setFormatMode("separate")}>
-                  OSOBNO
-                </Chip>
+                <Sel
+                  width={132}
+                  value={formatMode}
+                  onChange={(v) => setFormatMode(v as "together" | "separate")}
+                  options={[
+                    { v: "together", l: "razem" },
+                    { v: "separate", l: "osobno" },
+                  ]}
+                />
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: "auto" }}>
-                <span style={{ fontSize: 10, color: T.muted }}>
-                  koszt: <span style={{ color: previewCost > (credits ?? 0) ? T.red : T.text }}>{previewCost}</span>
+              <div className="peBarRun">
+                <span className="peBarCost">
+                  koszt <b style={{ color: previewCost > (credits ?? 0) ? T.red : T.text }}>{previewCost}</b>
                 </span>
-                <button
-                  type="button"
-                  onClick={generate}
-                  disabled={busy}
-                  className="peBtnPrimary"
-                >
+                <button type="button" onClick={generate} disabled={busy} className="peBtnPrimary">
                   {busy ? "PRACUJE…" : "URUCHOM"}
                 </button>
               </div>
             </div>
 
             <div className="peSession">
-            <div className="peStageHead">
-              <span className="peStageIndex">01</span>
-              <span className="peStageName">wejście</span>
-            </div>
             <div className="peWork">
             <div className="peCard peRail">
             {systemSlug === "n1" && mode === "prompt" ? (
@@ -1271,103 +1329,175 @@ export default function PromptEngine() {
               ))}
               {!blocks.length && !busy && (
                 <div className="peEmpty">
-                  <div className="peStack" aria-hidden>
-                    <div className="peStackCard">01</div>
-                    <div className="peStackCard">02</div>
-                    <div className="peStackCard">03</div>
-                  </div>
-                  <p className="peEmptyHint">Po URUCHOM tu wpadają sloty — jeden obraz, jeden job.</p>
+                  <IdleCanvas system={systemSlug} />
                 </div>
               )}
             </div>
             </div>
             </div>
 
-            <section className="peSessionLib">
-              <div className="peStageHead">
-                <span className="peStageIndex">02</span>
-                <span className="peStageName">biblioteka · {library.length}</span>
-              </div>
-              <div className="peLibChips">
-                <Chip active={activeFolder === "all"} onClick={() => setActiveFolder("all")}>
-                  Wszystkie ({library.length})
-                </Chip>
-                <Chip active={activeFolder === "none"} onClick={() => setActiveFolder("none")}>
-                  Bez folderu
-                </Chip>
-                {folders.map((f) => (
-                  <Chip key={f.id} active={activeFolder === f.id} onClick={() => setActiveFolder(f.id)}>
-                    {f.name}
-                  </Chip>
-                ))}
-                <Chip active={false} onClick={() => setLibFolderOpen(true)}>
-                  + folder
-                </Chip>
-              </div>
-              <div className="peLibFeed">
-                {libFiltered.map((p) => {
+            {sessionFeed.length > 0 && (
+              <section className="peFilm">
+                {sessionFeed.map((shot) => {
                   const copyText =
-                    p.format_mode === "together" && p.negative
-                      ? `${p.prompt}\n\nNegative prompt: ${p.negative}`
-                      : p.prompt;
+                    formatMode === "together" && shot.negative
+                      ? `${shot.prompt}\n\nNegative prompt: ${shot.negative}`
+                      : shot.prompt;
                   return (
-                    <article key={p.id} className="peCard peLibItem">
-                      {p.source_preview ? (
-                        <img src={p.source_preview} alt="" className="peLibThumb" />
+                    <article key={shot.key} className="peCard peFilmCard">
+                      {shot.preview ? (
+                        <img src={shot.preview} alt="" className="peFilmThumb" />
                       ) : (
-                        <div className="peLibThumb peLibThumbEmpty" />
+                        <div className="peFilmThumb peLibThumbEmpty" />
                       )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                          <div style={{ fontSize: 12, color: T.muted }}>
-                            {p.created_at} · {p.word_count} słów
-                          </div>
-                          <button type="button" style={ghostBtn} onClick={() => navigator.clipboard.writeText(copyText)}>
-                            Kopiuj
-                          </button>
-                          <button
-                            type="button"
-                            style={ghostBtn}
-                            onClick={async () => {
-                              await authFetch(`/api/prompts/${p.id}`, { method: "DELETE" });
-                              await loadLibrary();
-                            }}
-                          >
-                            Usuń
-                          </button>
-                        </div>
-                        <select
-                          className="peField"
-                          value={p.folder_id || ""}
-                          onChange={async (e) => {
-                            const folderId = e.target.value || null;
-                            await authFetch(`/api/prompts/${p.id}`, {
-                              method: "PATCH",
-                              body: JSON.stringify({ folderId }),
-                            });
-                            await loadLibrary();
-                          }}
-                          style={{ marginTop: 8, width: "auto" }}
-                        >
-                          <option value="">Bez folderu</option>
-                          {folders.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {f.name}
-                            </option>
-                          ))}
-                        </select>
-                        <pre className="peMono" style={{ whiteSpace: "pre-wrap", fontSize: 13, margin: "10px 0 0" }}>
-                          {p.prompt}
-                        </pre>
-                      </div>
+                      <p className="peFilmText">{shot.prompt}</p>
+                      <button type="button" className="peBtn" style={{ width: "100%" }} onClick={() => navigator.clipboard.writeText(copyText)}>
+                        Kopiuj
+                      </button>
                     </article>
                   );
                 })}
-                {!libFiltered.length && <p style={{ color: T.muted, fontSize: 13 }}>Sesja pusta — po URUCHOM prompt wpadnie tu.</p>}
-              </div>
-            </section>
+              </section>
+            )}
             </div>
           </>
+        )}
+
+        {tab === "biblioteka" && (
+          <div className="peLib">
+            <aside className="peCard" style={{ padding: 16 }}>
+              <div className="peLabel" style={{ padding: "6px 8px 12px" }}>FOLDERY</div>
+              <Chip active={activeFolder === "all"} onClick={() => setActiveFolder("all")}>
+                WSZYSTKIE ({library.length})
+              </Chip>
+              <div style={{ height: 8 }} />
+              <Chip active={activeFolder === "none"} onClick={() => setActiveFolder("none")}>
+                BEZ FOLDERU
+              </Chip>
+              <div style={{ height: 8 }} />
+              {folders.map((f) => (
+                <div key={f.id} style={{ marginBottom: 8 }}>
+                  <Chip active={activeFolder === f.id} onClick={() => setActiveFolder(f.id)}>
+                    {f.name}
+                  </Chip>
+                </div>
+              ))}
+              <div style={{ height: 8 }} />
+              <Chip active={false} onClick={() => setLibFolderOpen(true)}>
+                + FOLDER
+              </Chip>
+            </aside>
+            <div style={{ padding: "0 4px 24px", minWidth: 0 }}>
+              {picked.length > 0 && (
+                <div className="peLibBulk">
+                  <span style={{ fontSize: 12, color: T.muted }}>{picked.length} zaznaczone</span>
+                  <select
+                    className="peField"
+                    value=""
+                    onChange={async (e) => {
+                      const raw = e.target.value;
+                      if (!raw) return;
+                      const folderId = raw === "__none__" ? null : raw;
+                      await Promise.all(
+                        picked.map((id) => authFetch(`/api/prompts/${id}`, { method: "PATCH", body: JSON.stringify({ folderId }) }))
+                      );
+                      setPicked([]);
+                      await loadLibrary();
+                    }}
+                  >
+                    <option value="" disabled>
+                      Przenieś do folderu…
+                    </option>
+                    <option value="__none__">Bez folderu</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="peBtn"
+                    onClick={async () => {
+                      await Promise.all(picked.map((id) => authFetch(`/api/prompts/${id}`, { method: "DELETE" })));
+                      setPicked([]);
+                      await loadLibrary();
+                    }}
+                  >
+                    Usuń
+                  </button>
+                </div>
+              )}
+              {libFiltered.map((p) => {
+                const copyText =
+                  p.format_mode === "together" && p.negative
+                    ? `${p.prompt}\n\nNegative prompt: ${p.negative}`
+                    : p.prompt;
+                const on = picked.includes(p.id);
+                return (
+                  <article key={p.id} className="peCard peLibItem">
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() =>
+                        setPicked((prev) => (on ? prev.filter((id) => id !== p.id) : [...prev, p.id]))
+                      }
+                      style={{ marginTop: 8, accentColor: T.red }}
+                    />
+                    {p.source_preview ? (
+                      <img src={p.source_preview} alt="" className="peLibThumb" />
+                    ) : (
+                      <div className="peLibThumb peLibThumbEmpty" />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div style={{ fontSize: 12, color: T.muted }}>
+                          {p.created_at} · {p.word_count} słów
+                        </div>
+                        <button type="button" style={ghostBtn} onClick={() => navigator.clipboard.writeText(copyText)}>
+                          KOPIUJ
+                        </button>
+                        <button
+                          type="button"
+                          style={ghostBtn}
+                          onClick={async () => {
+                            await authFetch(`/api/prompts/${p.id}`, { method: "DELETE" });
+                            await loadLibrary();
+                          }}
+                        >
+                          USUŃ
+                        </button>
+                      </div>
+                      <select
+                        className="peField"
+                        value={p.folder_id || ""}
+                        onChange={async (e) => {
+                          const folderId = e.target.value || null;
+                          await authFetch(`/api/prompts/${p.id}`, {
+                            method: "PATCH",
+                            body: JSON.stringify({ folderId }),
+                          });
+                          await loadLibrary();
+                        }}
+                        style={{ marginTop: 8, width: "auto" }}
+                      >
+                        <option value="">Bez folderu</option>
+                        {folders.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                      </select>
+                      <pre className="peMono" style={{ whiteSpace: "pre-wrap", fontSize: 13, margin: "10px 0 0" }}>
+                        {p.prompt}
+                      </pre>
+                    </div>
+                  </article>
+                );
+              })}
+              {!libFiltered.length && <p style={{ color: T.muted, fontSize: 13 }}>Brak promptów w tym folderze.</p>}
+            </div>
+          </div>
         )}
 
         {tab === "konto" && (
