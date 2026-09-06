@@ -134,6 +134,29 @@ function formatCostDay(day: string) {
   return when.toLocaleDateString("pl-PL");
 }
 
+type CreditRow = {
+  id: string;
+  at: string;
+  delta: number;
+  reason: string;
+  systemSlug?: string | null;
+  model?: string | null;
+};
+
+function creditReasonLabel(row: CreditRow) {
+  if (row.reason === "generation") return row.systemSlug ? `Generacja ${row.systemSlug.toUpperCase()}` : "Generacja";
+  if (row.reason === "generation_failed") return "Nieukończone — zwrot";
+  if (row.reason === "starter") return "Start konta";
+  if (row.reason === "admin_grant" || row.reason === "mor_topup") return "Doładowanie";
+  return row.reason;
+}
+
+function formatLedgerWhen(iso: string) {
+  const when = new Date(iso);
+  if (Number.isNaN(when.getTime())) return iso;
+  return when.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
+}
+
 function StudioModal({
   title,
   children,
@@ -506,6 +529,8 @@ export default function PromptEngine() {
   const [inviteCredits, setInviteCredits] = useState("10");
   const [payoutHistoryOpen, setPayoutHistoryOpen] = useState(false);
   const [adminView, setAdminView] = useState<AdminView>("payouts");
+  const [creditLedger, setCreditLedger] = useState<CreditRow[]>([]);
+  const [ledgerBusy, setLedgerBusy] = useState(false);
 
   const current = systems.find((s) => s.slug === systemSlug);
   const isR1 = systemSlug === "r1";
@@ -730,6 +755,18 @@ export default function PromptEngine() {
     setReferredCount((json.referrals || []).length);
   }
 
+  async function loadLedger() {
+    setLedgerBusy(true);
+    try {
+      const json = await authFetch("/api/me/credits");
+      setCreditLedger(json.ledger || []);
+    } catch (e: unknown) {
+      setLoadErr(e instanceof Error ? e.message : "Nie wczytano historii kredytów.");
+    } finally {
+      setLedgerBusy(false);
+    }
+  }
+
   async function finishOnboarding() {
     setShowOnboard(false);
     try {
@@ -765,6 +802,9 @@ export default function PromptEngine() {
       <style>{`
         @keyframes peSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         @keyframes pePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+        .peKonto { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+        @media (max-width: 860px) { .peKonto { grid-template-columns: 1fr; } }
+        .peAdminNavBtn:hover { color: #EDEDED !important; }
       `}</style>
       {showOnboard && <OnboardingGuide systems={systems} onDone={finishOnboarding} />}
       {libFolderOpen && (
@@ -1001,6 +1041,7 @@ export default function PromptEngine() {
                 if (t === "biblioteka") await loadLibrary();
                 if (t === "nauczyciel") await loadTeacher();
                 if (t === "admin") await loadAdminShell();
+                if (t === "konto") await loadLedger();
               }}
             >
               {t === "admin" && payouts.filter((p) => p.status !== "done").length
@@ -1031,7 +1072,7 @@ export default function PromptEngine() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 16px" }}>
         {loadErr && (
           <div style={{ border: `1px solid ${T.red}`, color: T.red, fontSize: 11, padding: 12, marginBottom: 16 }}>
             {loadErr}
@@ -1326,39 +1367,81 @@ export default function PromptEngine() {
         )}
 
         {tab === "konto" && (
-          <div style={{ maxWidth: 640 }}>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.red }}>KONTO</h2>
-            <div
-              style={{
-                border: `1px solid ${T.line}`,
-                background: T.panel,
-                padding: 16,
-                margin: "12px 0 20px",
-              }}
-            >
-              <div style={{ fontSize: 13 }}>{email || "—"}</div>
-              <div style={{ fontSize: 22, margin: "10px 0 4px", color: (credits ?? 0) > 20 ? T.green : T.red }}>
-                {credits ?? "—"} kr
-              </div>
-              <p style={{ fontSize: 12, color: T.muted, lineHeight: 1.7, margin: 0 }}>
-                Nowe konto startuje z 10 kredytami. Wynik w konsoli to tekst do kopiowania, nie wygenerowany obraz.
-              </p>
-              <a href="/terms" style={{ display: "inline-block", marginTop: 12, fontSize: 11, color: T.red }}>
-                Terms of Use
-              </a>
-            </div>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>SYSTEMY</h2>
-            {systems.map((s) => (
-              <article key={s.slug} style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 14, marginTop: 12 }}>
-                <div style={{ fontSize: 13, color: T.text }}>
-                  {s.icon} {s.label}
+          <div>
+            <div className="peKonto">
+              <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 20 }}>
+                <div style={{ fontSize: 10, letterSpacing: "0.16em", color: T.muted }}>SALDO</div>
+                <div style={{ fontSize: 42, lineHeight: 1.1, margin: "12px 0 8px", color: (credits ?? 0) > 20 ? T.green : T.red }}>
+                  {credits ?? "—"}
                 </div>
-                <p style={{ fontSize: 12, color: T.muted, lineHeight: 1.7, margin: "8px 0 0" }}>{s.desc_user || "—"}</p>
-                {s.inputs_desc && (
-                  <p style={{ fontSize: 11, color: T.muted, margin: "6px 0 0" }}>Wejście: {s.inputs_desc}</p>
+                <div style={{ fontSize: 12, color: T.muted, marginBottom: 16 }}>kredytów</div>
+                <div style={{ fontSize: 12, wordBreak: "break-all" }}>{email || "—"}</div>
+                <p style={{ fontSize: 12, color: T.muted, lineHeight: 1.7, margin: "16px 0 0" }}>
+                  Konsola zwraca tekst do kopiowania. Start: 10 kr. Ceny USD nie są tu pokazywane.
+                </p>
+                <a href="/terms" style={{ display: "inline-block", marginTop: 16, fontSize: 11, color: T.red }}>
+                  Terms of Use
+                </a>
+              </div>
+              <div style={{ border: `1px solid ${T.line}`, background: T.panel, minHeight: 320 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    padding: "14px 16px",
+                    borderBottom: `1px solid ${T.line}`,
+                  }}
+                >
+                  <span style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red }}>ZUŻYCIE</span>
+                  <span style={{ fontSize: 11, color: T.muted }}>
+                    {ledgerBusy
+                      ? "ładuję…"
+                      : `${creditLedger.filter((r) => r.reason === "generation").length} gen · ${creditLedger
+                          .filter((r) => r.delta < 0)
+                          .reduce((s, r) => s + Math.abs(r.delta), 0)} kr zużyte`}
+                  </span>
+                </div>
+                {ledgerBusy && !creditLedger.length && (
+                  <div style={{ padding: 16, color: T.muted, fontSize: 12, animation: "pePulse 1.1s ease-in-out infinite" }}>
+                    Wczytuję historię…
+                  </div>
                 )}
-              </article>
-            ))}
+                {!ledgerBusy && creditLedger.length === 0 && (
+                  <div style={{ padding: 16, color: T.muted, fontSize: 12, lineHeight: 1.7 }}>
+                    Tu pojawi się historia kredytów po pierwszej generacji albo doładowaniu.
+                  </div>
+                )}
+                {creditLedger.map((row) => (
+                  <div
+                    key={row.id}
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "baseline",
+                      padding: "10px 16px",
+                      borderBottom: `1px solid ${T.line}`,
+                      fontSize: 12,
+                    }}
+                  >
+                    <span style={{ width: 132, flexShrink: 0, color: T.muted }}>{formatLedgerWhen(row.at)}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      {creditReasonLabel(row)}
+                      {row.model ? <span style={{ color: T.muted }}> · {row.model}</span> : null}
+                    </span>
+                    <span
+                      style={{
+                        width: 72,
+                        textAlign: "right",
+                        color: row.delta > 0 ? T.green : row.delta < 0 ? T.red : T.muted,
+                      }}
+                    >
+                      {row.delta === 0 ? "—" : `${row.delta > 0 ? "+" : ""}${row.delta} kr`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1598,16 +1681,52 @@ export default function PromptEngine() {
         )}
 
         {tab === "admin" && isAdmin && (
-          <section>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-              {ADMIN_VIEWS.map((v) => (
-                <Chip key={v.id} active={adminView === v.id} onClick={() => setAdminView(v.id)}>
-                  {v.id === "payouts" && payouts.filter((p) => p.status !== "done").length
-                    ? `${v.l} · ${payouts.filter((p) => p.status !== "done").length}`
-                    : v.l}
-                </Chip>
-              ))}
-            </div>
+          <section
+            style={{
+              display: "flex",
+              minHeight: 560,
+              border: `1px solid ${T.line}`,
+              background: T.panel,
+            }}
+          >
+            <aside
+              style={{
+                width: 188,
+                flexShrink: 0,
+                borderRight: `1px solid ${T.line}`,
+                background: T.panel2,
+                padding: "12px 10px",
+              }}
+            >
+              <div style={{ fontSize: 10, letterSpacing: "0.16em", color: T.muted, padding: "6px 8px 14px" }}>ADMIN</div>
+              {ADMIN_VIEWS.map((v) => {
+                const open = v.id === "payouts" ? payouts.filter((p) => p.status !== "done").length : 0;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setAdminView(v.id)}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      fontFamily: MONO,
+                      fontSize: 11,
+                      letterSpacing: "0.08em",
+                      padding: "10px 10px",
+                      marginBottom: 4,
+                      cursor: "pointer",
+                      color: adminView === v.id ? T.text : T.muted,
+                      background: adminView === v.id ? T.bg : "transparent",
+                      border: `1px solid ${adminView === v.id ? T.red : "transparent"}`,
+                    }}
+                  >
+                    {open ? `${v.l} · ${open}` : v.l}
+                  </button>
+                );
+              })}
+            </aside>
+            <div style={{ flex: 1, minWidth: 0, padding: 20 }}>
             {adminView === "payouts" && (
               <>
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>WYPŁATY</h2>
@@ -1704,48 +1823,46 @@ export default function PromptEngine() {
                 {payouts.some((p) => p.teacher_id === u.id && p.status !== "done") && (
                   <span style={{ color: T.red, fontSize: 10 }}>ticket</span>
                 )}
-                <button
-                  type="button"
-                  style={ghostBtn}
-                  onClick={() => setAdminModal({ kind: "ref", userId: u.id, email: u.email, value: u.referral_code || "" })}
-                >
-                  KOD REF
-                </button>
-                <button
-                  type="button"
-                  style={ghostBtn}
-                  onClick={() => setAdminModal({ kind: "credits", userId: u.id, email: u.email, value: "900" })}
-                >
-                  KREDYTY
-                </button>
-                <button
-                  type="button"
-                  style={ghostBtn}
-                  onClick={async () => {
-                    await authFetch(`/api/admin/users/${u.id}/ban`, {
-                      method: "POST",
-                      body: JSON.stringify({ banned: !u.is_banned }),
-                    });
-                    await loadAdminShell();
+                <select
+                  defaultValue=""
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 10,
+                    background: T.bg,
+                    color: T.text,
+                    border: `1px solid ${T.line2}`,
+                    padding: "4px 6px",
+                    colorScheme: "dark",
+                    marginLeft: "auto",
                   }}
-                >
-                  {u.is_banned ? "ODBANUJ" : "BAN"}
-                </button>
-                {u.id !== myUserId && (
-                  <button
-                    type="button"
-                    style={{ ...ghostBtn, borderColor: T.red, color: T.red }}
-                    onClick={async () => {
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    e.target.value = "";
+                    if (val === "credits") {
+                      setAdminModal({ kind: "credits", userId: u.id, email: u.email, value: "900" });
+                    } else if (val === "ref") {
+                      setAdminModal({ kind: "ref", userId: u.id, email: u.email, value: u.referral_code || "" });
+                    } else if (val === "ban") {
+                      await authFetch(`/api/admin/users/${u.id}/ban`, {
+                        method: "POST",
+                        body: JSON.stringify({ banned: !u.is_banned }),
+                      });
+                      await loadAdminShell();
+                    } else if (val === "delete" && u.id !== myUserId) {
                       const mail = u.email || u.id;
                       if (!window.confirm(`Na zawsze skasować ${mail}? Mail wróci do puli. Tego nie cofniesz.`)) return;
                       if (!window.confirm("Na pewno? Znikną prompty, kredyty i konto Auth.")) return;
                       await authFetch(`/api/admin/users/${u.id}`, { method: "DELETE" });
                       await loadAdminShell();
-                    }}
-                  >
-                    USUŃ KONTO
-                  </button>
-                )}
+                    }
+                  }}
+                >
+                  <option value="">akcja</option>
+                  <option value="credits">Kredyty</option>
+                  <option value="ref">Kod ref</option>
+                  <option value="ban">{u.is_banned ? "Odbanuj" : "Ban"}</option>
+                  {u.id !== myUserId && <option value="delete">Usuń konto</option>}
+                </select>
               </div>
             ))}
 
@@ -1872,6 +1989,7 @@ export default function PromptEngine() {
             ))}
               </>
             )}
+            </div>
           </section>
         )}
       </div>
