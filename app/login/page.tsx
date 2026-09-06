@@ -146,63 +146,93 @@ export default function LoginPage() {
 
   if (recovery) {
     return (
-      <main style={{ maxWidth: 420, margin: "80px auto", padding: 24 }}>
-        <h1 style={{ color: "#E5152A" }}>USTAW HASŁO</h1>
-        <p style={{ color: "#8A8A8A", fontSize: 13 }}>Zaproszenie albo reset — wymyśl hasło (min. 6 znaków), potem wejdziesz na konsolę.</p>
-        <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nowe hasło" style={field} />
-        <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ ...btn, background: "transparent", color: "#8A8A8A", marginTop: 8 }}>
-          {showPassword ? "Ukryj hasło" : "Pokaż hasło"}
-        </button>
-        {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
-        <button disabled={busy} onClick={saveNewPassword} style={btn}>
-          Zapisz
-        </button>
+      <main className="peLogin" style={shell}>
+        <aside style={brandPane}>
+          <div style={{ letterSpacing: "0.18em", color: "#E5152A", fontSize: 18 }}>PROMPT_ENGINE</div>
+          <p style={{ color: "#8A8A8A", fontSize: 13, lineHeight: 1.7, marginTop: 16 }}>Ustaw hasło i wejdź na konsolę.</p>
+        </aside>
+        <section style={formPane}>
+          <h1 style={{ color: "#EDEDED", fontSize: 18, fontWeight: 400 }}>USTAW HASŁO</h1>
+          <p style={{ color: "#8A8A8A", fontSize: 13 }}>Zaproszenie albo reset — min. 6 znaków.</p>
+          <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nowe hasło" style={field} />
+          <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ ...btn, background: "transparent", color: "#8A8A8A", marginTop: 8 }}>
+            {showPassword ? "Ukryj hasło" : "Pokaż hasło"}
+          </button>
+          {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
+          <button disabled={busy} onClick={saveNewPassword} style={{ ...btn, marginTop: 16, opacity: busy ? 0.7 : 1 }}>
+            {busy ? "Zapisuję…" : "Zapisz"}
+          </button>
+        </section>
       </main>
     );
   }
 
   return (
-    <main style={{ maxWidth: 420, margin: "80px auto", padding: 24 }}>
-      <h1 style={{ color: "#E5152A" }}>PROMPT_ENGINE</h1>
-      <p>Zaloguj się, żeby korzystać z konsoli.</p>
-      <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" style={field} />
-      <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="hasło" style={field} />
-      <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ background: "none", border: "none", color: "#8A8A8A", fontSize: 12, padding: "6px 0", cursor: "pointer" }}>
-        {showPassword ? "Ukryj hasło" : "Pokaż hasło"}
-      </button>
-      <label style={{ display: "flex", gap: 8, margin: "12px 0", fontSize: 13 }}>
-        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-        Potwierdzam prawa do wrzucanych materiałów i akceptuję{" "}
-        <a href="/terms">Terms of Use</a>.
-      </label>
-      {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
-      {info && <p style={{ color: "#9f9" }}>{info}</p>}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button disabled={busy} onClick={() => signIn("in")} style={btn}>
-          Zaloguj
+    <main className="peLogin" style={shell}>
+      <aside style={brandPane}>
+        <div style={{ letterSpacing: "0.18em", color: "#E5152A", fontSize: 18 }}>PROMPT_ENGINE</div>
+        <p style={{ color: "#8A8A8A", fontSize: 13, lineHeight: 1.7, marginTop: 16, maxWidth: 280 }}>
+          Konsola N1 / S1 / R1. Wynik to tekst do kopiowania.
+        </p>
+      </aside>
+      <section style={formPane}>
+        <h1 style={{ color: "#EDEDED", fontSize: 18, fontWeight: 400, marginBottom: 4 }}>Wejście</h1>
+        <p style={{ color: "#8A8A8A", fontSize: 13, marginTop: 0 }}>Zaloguj albo załóż konto.</p>
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" style={field} />
+        <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="hasło" style={field} />
+        <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ background: "none", border: "none", color: "#8A8A8A", fontSize: 12, padding: "6px 0", cursor: "pointer" }}>
+          {showPassword ? "Ukryj hasło" : "Pokaż hasło"}
         </button>
-        <button disabled={busy} onClick={() => signIn("up")} style={btn}>
-          Rejestracja
+        <label style={{ display: "flex", gap: 8, margin: "12px 0", fontSize: 13, color: "#8A8A8A" }}>
+          <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+          <span>
+            Potwierdzam prawa do wrzucanych materiałów i akceptuję <a href="/terms">Terms of Use</a>.
+          </span>
+        </label>
+        {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
+        {info && <p style={{ color: "#9f9" }}>{info}</p>}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          <button disabled={busy} onClick={() => signIn("in")} style={{ ...btn, opacity: busy ? 0.7 : 1 }}>
+            {busy ? "…" : "Zaloguj"}
+          </button>
+          <button disabled={busy} onClick={() => signIn("up")} style={{ ...btn, background: "transparent", color: "#EDEDED", border: "1px solid #3A3A3A" }}>
+            Rejestracja
+          </button>
+          <button disabled={busy} onClick={google} style={{ ...btn, background: "transparent", color: "#EDEDED", border: "1px solid #3A3A3A" }}>
+            Google
+          </button>
+        </div>
+        <button type="button" disabled={busy} onClick={sendReset} style={{ ...btn, background: "transparent", color: "#8A8A8A", marginTop: 16, padding: 0 }}>
+          Nie pamiętam hasła
         </button>
-        <button disabled={busy} onClick={google} style={btn}>
-          Google
-        </button>
-      </div>
-      <button type="button" disabled={busy} onClick={sendReset} style={{ ...btn, background: "transparent", color: "#8A8A8A", marginTop: 12, padding: 0 }}>
-        Nie pamiętam hasła
-      </button>
+      </section>
     </main>
   );
 }
 
+const shell: CSSProperties = {
+  minHeight: "100vh",
+  display: "grid",
+  gridTemplateColumns: "minmax(240px, 42%) minmax(0, 1fr)",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  background: "#0A0A0A",
+};
+const brandPane: CSSProperties = {
+  borderRight: "1px solid #272727",
+  padding: "64px 40px",
+  background: "#141414",
+};
+const formPane: CSSProperties = {
+  padding: "64px 40px",
+  maxWidth: 480,
+};
 const field: CSSProperties = {
   display: "block",
   width: "100%",
   marginTop: 8,
   background: "#141414",
   color: "#ededed",
-  border: "1px solid #333",
-  borderRadius: 8,
+  border: "1px solid #3A3A3A",
   padding: 10,
 };
 const btn: CSSProperties = {
@@ -210,5 +240,4 @@ const btn: CSSProperties = {
   color: "#fff",
   border: "none",
   padding: "10px 14px",
-  borderRadius: 8,
 };

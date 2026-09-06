@@ -1,5 +1,14 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; background: #0A0A0A; color: #EDEDED; }
+html, body { margin: 0; height: 100%; background: #0A0A0A; color: #EDEDED; }
 a { color: #E5152A; }
 button { cursor: pointer; }
+button:disabled { cursor: wait; }
 select, option { color-scheme: dark; background: #0A0A0A; color: #EDEDED; }
+::selection { background: #E5152A; color: #fff; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0A0A0A; }
+::-webkit-scrollbar-thumb { background: #3A3A3A; }
+input, textarea, select, button { font-family: inherit; }
+@media (max-width: 800px) {
+  .peLogin { grid-template-columns: 1fr !important; }
+}

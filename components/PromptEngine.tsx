@@ -310,6 +310,7 @@ function Chip({
   return (
     <button
       type="button"
+      className="peChip"
       onClick={onClick}
       style={{
         fontFamily: MONO,
@@ -395,7 +396,7 @@ function OnboardingGuide({
     },
     {
       t: "URUCHOM",
-      b: "Czerwony przycisk na dole lewej kolumny. Zużywa kredyty. Wynik to tekst do kopiowania, nie obraz.",
+      b: "Czerwony przycisk w górnym pasku konsoli. Zużywa kredyty. Wynik to tekst do kopiowania, nie obraz.",
     },
     {
       t: "KOPIUJ",
@@ -808,6 +809,12 @@ export default function PromptEngine() {
         .peWork { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); min-height: calc(100vh - 118px); }
         @media (max-width: 960px) { .peWork { grid-template-columns: 1fr; min-height: auto; } }
         .peJobs { overflow: auto; min-height: 420px; }
+        .peJobGrid { display: flex; flex-direction: column; gap: 8px; }
+        @media (min-width: 1320px) { .peJobGrid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; } }
+        .peLib { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 0; min-height: calc(100vh - 86px); border: 1px solid #272727; }
+        @media (max-width: 860px) { .peLib { grid-template-columns: 1fr; } }
+        .peChip:hover { border-color: #EDEDED !important; }
+        .peBusyBar { height: 2px; background: linear-gradient(90deg, transparent, #E5152A, transparent); animation: peSweep 1.2s linear infinite; }
       `}</style>
       {showOnboard && <OnboardingGuide systems={systems} onDone={finishOnboarding} />}
       {libFolderOpen && (
@@ -1015,9 +1022,9 @@ export default function PromptEngine() {
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "12px 16px",
+          gap: 16,
+          padding: "0 16px",
+          height: 52,
           borderBottom: `1px solid ${T.line}`,
           position: "sticky",
           top: 0,
@@ -1025,14 +1032,8 @@ export default function PromptEngine() {
           zIndex: 10,
         }}
       >
-        <div>
-          <span style={{ fontSize: 14, letterSpacing: "0.14em", color: T.red }}>PROMPT_ENGINE</span>
-          <span style={{ fontSize: 10, color: T.muted, marginLeft: 8 }}>
-            {email}
-            {isAdmin ? " · admin" : ""}
-          </span>
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <span style={{ fontSize: 14, letterSpacing: "0.14em", color: T.red, flexShrink: 0 }}>PROMPT_ENGINE</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1, minWidth: 0 }}>
           {(
             ["konsola", "konto", "biblioteka", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
           ).map((t) => (
@@ -1052,6 +1053,12 @@ export default function PromptEngine() {
                 : t.toUpperCase()}
             </Chip>
           ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto" }}>
+          <span style={{ fontSize: 10, color: T.muted, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {email}
+            {isAdmin ? " · admin" : ""}
+          </span>
           <span
             style={{
               padding: "4px 10px",
@@ -1184,12 +1191,12 @@ export default function PromptEngine() {
                   disabled={busy}
                   style={{
                     fontFamily: MONO,
-                    fontSize: 11,
+                    fontSize: 12,
                     letterSpacing: "0.1em",
                     background: busy ? T.line2 : T.red,
                     color: "#fff",
                     border: "none",
-                    padding: "8px 20px",
+                    padding: "10px 22px",
                     cursor: busy ? "wait" : "pointer",
                     animation: busy ? "pePulse 1.1s ease-in-out infinite" : undefined,
                   }}
@@ -1359,7 +1366,28 @@ export default function PromptEngine() {
             )}
             </div>
 
-            <div className="peJobs" style={{ padding: 16, background: T.bg }}>
+            <div className="peJobs" style={{ display: "flex", flexDirection: "column", background: T.bg, minHeight: 0 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 16px",
+                  borderBottom: `1px solid ${T.line}`,
+                  background: T.panel,
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red }}>
+                  JOBY
+                  {blocks.length ? ` · ${blocks.filter((b) => !b.pending).length}/${blocks.length}` : ""}
+                </span>
+                <span style={{ fontSize: 11, color: T.muted }}>
+                  {busy ? "pracuje…" : blocks.length ? `${blocks.filter((b) => b.error).length} blokad` : "pusto"}
+                </span>
+              </div>
+              {busy && <div className="peBusyBar" />}
+              <div className="peJobGrid" style={{ padding: 12, flex: 1 }}>
               {blocks.map((b, i) => (
                 <ResultCard
                   key={b.id || `slot-${i}`}
@@ -1374,7 +1402,7 @@ export default function PromptEngine() {
               {!blocks.length && !busy && (
                 <div
                   style={{
-                    minHeight: "calc(100vh - 160px)",
+                    minHeight: 280,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1392,6 +1420,7 @@ export default function PromptEngine() {
                   URUCHOM zapełni tę kolumnę slotami — jeden obraz = jeden job.
                 </div>
               )}
+            </div>
             </div>
             </div>
           </>
@@ -1477,23 +1506,30 @@ export default function PromptEngine() {
         )}
 
         {tab === "biblioteka" && (
-          <div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+          <div className="peLib">
+            <aside style={{ borderRight: `1px solid ${T.line}`, background: T.panel2, padding: 12 }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.16em", color: T.muted, padding: "6px 8px 12px" }}>FOLDERY</div>
               <Chip active={activeFolder === "all"} onClick={() => setActiveFolder("all")}>
                 WSZYSTKIE ({library.length})
               </Chip>
+              <div style={{ height: 8 }} />
               <Chip active={activeFolder === "none"} onClick={() => setActiveFolder("none")}>
                 BEZ FOLDERU
               </Chip>
+              <div style={{ height: 8 }} />
               {folders.map((f) => (
-                <Chip key={f.id} active={activeFolder === f.id} onClick={() => setActiveFolder(f.id)}>
-                  {f.name}
-                </Chip>
+                <div key={f.id} style={{ marginBottom: 8 }}>
+                  <Chip active={activeFolder === f.id} onClick={() => setActiveFolder(f.id)}>
+                    {f.name}
+                  </Chip>
+                </div>
               ))}
+              <div style={{ height: 8 }} />
               <Chip active={false} onClick={() => setLibFolderOpen(true)}>
                 + FOLDER
               </Chip>
-            </div>
+            </aside>
+            <div style={{ padding: 16, overflow: "auto" }}>
             {libFiltered.map((p) => {
               const copyText =
                 p.format_mode === "together" && p.negative
@@ -1586,11 +1622,12 @@ export default function PromptEngine() {
               );
             })}
             {!libFiltered.length && <p style={{ color: T.muted, fontSize: 11 }}>Brak promptów.</p>}
+            </div>
           </div>
         )}
 
         {tab === "nauczyciel" && referralCode && (
-          <div style={{ maxWidth: 640 }}>
+          <div className="peKonto">
             <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red, marginBottom: 12 }}>AFILIACJA</div>
               <p style={{ fontSize: 13, lineHeight: 1.7, color: T.muted }}>
@@ -1715,7 +1752,7 @@ export default function PromptEngine() {
           <section
             style={{
               display: "flex",
-              minHeight: 560,
+              minHeight: "calc(100vh - 52px)",
               border: `1px solid ${T.line}`,
               background: T.panel,
             }}
@@ -2092,7 +2129,7 @@ function ResultCard({
   }
 
   return (
-    <div style={{ marginBottom: 8, border: `1px solid ${T.line}`, background: T.panel }}>
+    <div style={{ marginBottom: 0, height: "100%", border: `1px solid ${T.line}`, background: T.panel }}>
       {folderModal && (
         <StudioModal title="NOWY FOLDER" onClose={() => !folderBusy && setFolderModal(false)}>
           <input
