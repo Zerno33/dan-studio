@@ -805,6 +805,9 @@ export default function PromptEngine() {
         .peKonto { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
         @media (max-width: 860px) { .peKonto { grid-template-columns: 1fr; } }
         .peAdminNavBtn:hover { color: #EDEDED !important; }
+        .peWork { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); min-height: calc(100vh - 118px); }
+        @media (max-width: 960px) { .peWork { grid-template-columns: 1fr; min-height: auto; } }
+        .peJobs { overflow: auto; min-height: 420px; }
       `}</style>
       {showOnboard && <OnboardingGuide systems={systems} onDone={finishOnboarding} />}
       {libFolderOpen && (
@@ -1072,7 +1075,7 @@ export default function PromptEngine() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 16px" }}>
+      <div style={{ width: "100%", padding: tab === "konsola" ? 0 : "16px 20px", boxSizing: "border-box" }}>
         {loadErr && (
           <div style={{ border: `1px solid ${T.red}`, color: T.red, fontSize: 11, padding: 12, marginBottom: 16 }}>
             {loadErr}
@@ -1088,8 +1091,9 @@ export default function PromptEngine() {
                 alignItems: "center",
                 gap: "12px 24px",
                 padding: 12,
-                marginBottom: 20,
-                border: `1px solid ${T.line}`,
+                marginBottom: 0,
+                border: "none",
+                borderBottom: `1px solid ${T.line}`,
                 background: T.panel,
               }}
             >
@@ -1195,6 +1199,18 @@ export default function PromptEngine() {
               </div>
             </div>
 
+            <div className="peWork">
+            <div
+              style={{
+                borderRight: `1px solid ${T.line}`,
+                background: T.panel,
+                padding: 16,
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+                minHeight: 0,
+              }}
+            >
             {systemSlug === "n1" && mode === "prompt" ? (
               <div style={{ border: `1px solid ${T.line2}`, background: T.panel, marginBottom: 20 }}>
                 <textarea
@@ -1216,7 +1232,7 @@ export default function PromptEngine() {
                 />
               </div>
             ) : (
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ flex: 1, minHeight: 220 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                   <Label>
                     {isR1 ? "BAZA — 1 OBRAZ" : systemSlug === "s1" ? "OBRAZ — OPCJONALNY" : `INSPIRACJE — ${images.length}/10`}
@@ -1240,7 +1256,16 @@ export default function PromptEngine() {
                     const got = filesFromDrop(e.dataTransfer);
                     if (got.length) await addFiles(got);
                   }}
-                  style={{ display: "flex", flexWrap: "wrap", gap: 12 }}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 10,
+                    alignContent: "flex-start",
+                    minHeight: 240,
+                    padding: 12,
+                    border: `1px dashed ${dragOver ? T.red : T.line2}`,
+                    background: T.bg,
+                  }}
                 >
                   {images.map((img, i) => (
                     <div key={img.id} style={{ position: "relative", width: 112, height: 146, border: `1px solid ${T.line2}` }}>
@@ -1274,15 +1299,17 @@ export default function PromptEngine() {
                       type="button"
                       onClick={() => fileRef.current?.click()}
                       style={{
-                        width: 112,
-                        height: 146,
+                        width: images.length ? 112 : "100%",
+                        height: images.length ? 146 : 216,
                         border: `1px dashed ${dragOver ? T.red : T.line2}`,
                         background: T.panel,
                         color: T.muted,
-                        fontSize: 20,
+                        fontSize: images.length ? 20 : 13,
+                        letterSpacing: "0.08em",
+                        cursor: "pointer",
                       }}
                     >
-                      +
+                      {images.length ? "+" : "Upuść zdjęcia albo Ctrl+V"}
                     </button>
                   )}
                 </div>
@@ -1325,16 +1352,14 @@ export default function PromptEngine() {
                 }}
               />
             </div>
-            <div style={{ fontSize: 10, color: T.muted, marginTop: 8, lineHeight: 1.8 }}>
-              {current?.desc_user} {current?.inputs_desc}
-            </div>
             {error && (
-              <div style={{ marginTop: 16, padding: 12, border: `1px solid ${T.red}`, color: T.red, fontSize: 11 }}>
+              <div style={{ padding: 12, border: `1px solid ${T.red}`, color: T.red, fontSize: 11 }}>
                 {error}
               </div>
             )}
+            </div>
 
-            <div style={{ marginTop: 24, display: "grid", gap: 10 }}>
+            <div className="peJobs" style={{ padding: 16, background: T.bg }}>
               {blocks.map((b, i) => (
                 <ResultCard
                   key={b.id || `slot-${i}`}
@@ -1349,19 +1374,25 @@ export default function PromptEngine() {
               {!blocks.length && !busy && (
                 <div
                   style={{
-                    textAlign: "center",
-                    padding: 56,
-                    border: `1px dashed ${T.line}`,
+                    minHeight: "calc(100vh - 160px)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: `1px solid ${T.line}`,
+                    background: T.panel,
                     color: T.muted,
-                    fontSize: 11,
-                    lineHeight: 2,
+                    fontSize: 12,
+                    lineHeight: 1.8,
+                    textAlign: "center",
+                    padding: 32,
                   }}
                 >
-                  Wybierz system, wrzuć wejście (drop albo Ctrl+V), uruchom.
+                  Lewa szyna: wrzuć inspiracje albo wklej prompt.
                   <br />
-                  N1 z pięcioma zdjęciami zwróci pięć osobnych bloków.
+                  URUCHOM zapełni tę kolumnę slotami — jeden obraz = jeden job.
                 </div>
               )}
+            </div>
             </div>
           </>
         )}
