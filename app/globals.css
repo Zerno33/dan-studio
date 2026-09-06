@@ -12,12 +12,11 @@
   --pe-radius: 16px;
   --pe-radius-sm: 10px;
   --pe-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --pe-display: var(--font-display), Iowan Old Style, Palatino Linotype, Palatino, Georgia, serif;
 }
 
 html, body {
   margin: 0;
-  height: 100%;
+  min-height: 100%;
   background: var(--pe-bg);
   color: var(--pe-fg);
 }
@@ -47,19 +46,11 @@ input, textarea, select, button { font-family: inherit; }
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes peGridDrift {
-  from { background-position: 0 0, 0 0; }
-  to { background-position: 40px 40px, 40px 40px; }
-}
-
-body::after {
-  content: "";
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  opacity: 0.045;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
+@keyframes peDeck {
+  0%, 100% { transform: translate3d(-48px, 18px, 0) rotate(-7deg) scale(0.88); opacity: 0.38; z-index: 1; }
+  18%, 32% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); opacity: 1; z-index: 3; }
+  50%, 64% { transform: translate3d(48px, 12px, 0) rotate(7deg) scale(0.9); opacity: 0.5; z-index: 2; }
+  82% { transform: translate3d(-48px, 18px, 0) rotate(-7deg) scale(0.88); opacity: 0.38; z-index: 1; }
 }
 
 .peApp {
@@ -84,12 +75,10 @@ body::after {
 }
 .peTopBrand {
   justify-self: start;
-  font-family: var(--pe-display);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.16em;
   color: var(--pe-red);
-  font-size: 18px;
-  font-style: italic;
-  font-weight: 400;
+  font-size: 13px;
+  font-weight: 650;
 }
 .peTopNav { justify-self: center; display: flex; flex-wrap: wrap; gap: 4px; }
 .peTopUser {
@@ -190,12 +179,31 @@ body::after {
   backdrop-filter: blur(14px);
 }
 
+.peSession {
+  padding: 4px 16px 56px;
+}
+.peStageHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 18px 4px 10px;
+}
+.peStageIndex {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--pe-red);
+  font-variant-numeric: tabular-nums;
+}
+.peStageName {
+  font-size: 13px;
+  color: var(--pe-muted);
+  letter-spacing: 0.04em;
+}
 .peWork {
   display: grid;
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
   gap: 16px;
-  padding: 16px;
-  min-height: calc(100vh - 148px);
+  min-height: 62vh;
 }
 .peRail {
   display: flex;
@@ -205,16 +213,11 @@ body::after {
   padding: 16px;
 }
 .peJobs {
-  overflow: auto;
-  min-height: 420px;
+  overflow: hidden;
+  min-height: 360px;
   display: flex;
   flex-direction: column;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
-  background-size: 40px 40px;
-  background-color: rgba(8, 8, 8, 0.45);
-  animation: peGridDrift 28s linear infinite;
+  background: rgba(8, 8, 8, 0.45);
 }
 .peJobsHead {
   display: flex;
@@ -245,32 +248,49 @@ body::after {
 .peJobGrid > .peJob:nth-child(4) { animation-delay: 0.2s; }
 .peJobGrid > .peJob:nth-child(n + 5) { animation-delay: 0.26s; }
 .peEmpty {
-  min-height: 360px;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   color: var(--pe-muted);
-  font-size: 14px;
-  line-height: 1.8;
+  font-size: 13px;
+  line-height: 1.6;
   text-align: center;
-  padding: 48px 32px;
+  padding: 36px 24px 28px;
 }
-.peEmptyKicker {
+.peJobGrid > .peEmpty { grid-column: 1 / -1; }
+.peEmptyHint {
+  margin: 8px 0 0;
+  max-width: 280px;
+  color: var(--pe-muted);
+}
+.peStack {
+  position: relative;
+  width: 240px;
+  height: 148px;
+  margin: 0 auto 8px;
+  perspective: 640px;
+}
+.peStackCard {
+  position: absolute;
+  inset: 18px 28px;
+  border-radius: 14px;
+  border: 1px solid var(--pe-line2);
+  background: linear-gradient(180deg, rgba(28, 28, 28, 0.95), rgba(14, 14, 14, 0.92));
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 12px 14px;
+  color: var(--pe-red);
   font-size: 11px;
   letter-spacing: 0.16em;
-  color: var(--pe-red);
-  margin-bottom: 12px;
+  animation: peDeck 9s ease-in-out infinite;
 }
-.peEmptyTitle {
-  font-family: var(--pe-display);
-  font-style: italic;
-  font-size: 36px;
-  color: var(--pe-fg);
-  letter-spacing: -0.03em;
-  margin-bottom: 14px;
-  line-height: 1.1;
-}
+.peStackCard:nth-child(1) { animation-delay: 0s; }
+.peStackCard:nth-child(2) { animation-delay: -3s; }
+.peStackCard:nth-child(3) { animation-delay: -6s; }
 .peDrop {
   display: flex;
   flex-wrap: wrap;
@@ -308,13 +328,11 @@ body::after {
   align-items: start;
 }
 .peBalance {
-  font-family: var(--pe-display);
   font-size: 56px;
   line-height: 1;
   letter-spacing: -0.04em;
   font-weight: 650;
   margin: 16px 0 8px;
-  text-shadow: 0 0 40px rgba(229, 21, 42, 0.28);
 }
 .peLedgerRow {
   display: flex;
@@ -330,6 +348,45 @@ body::after {
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 16px;
   min-height: calc(100vh - 96px);
+}
+.peSessionLib {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--pe-line);
+}
+.peLibChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0 16px;
+}
+.peLibFeed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.peLibItem {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  animation: peRise 0.5s ease both;
+}
+.peLibFeed > .peLibItem:nth-child(1) { animation-delay: 0.02s; }
+.peLibFeed > .peLibItem:nth-child(2) { animation-delay: 0.07s; }
+.peLibFeed > .peLibItem:nth-child(3) { animation-delay: 0.12s; }
+.peLibFeed > .peLibItem:nth-child(n + 4) { animation-delay: 0.16s; }
+.peLibThumb {
+  width: 72px;
+  height: 94px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--pe-line2);
+  border-radius: 10px;
+}
+.peLibThumbEmpty {
+  background: rgba(255, 255, 255, 0.03);
+  border-style: dashed;
 }
 
 .peAdmin {
@@ -373,7 +430,6 @@ body::after {
 .peMetric { padding: 16px 18px; }
 .peMetric b {
   display: block;
-  font-family: var(--pe-display);
   font-size: 22px;
   letter-spacing: -0.03em;
   margin-top: 6px;
@@ -455,4 +511,12 @@ body::after {
   .peLogin { grid-template-columns: 1fr; }
   .peLoginBrand { border-right: none; border-bottom: 1px solid var(--pe-line); padding: 40px 24px; }
   .peLoginForm { padding: 40px 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .peApp, .peJob, .peLibItem, .peBusyBar { animation: none; }
+  .peBtnPrimary:not(:disabled) { animation: none; }
+  .peStackCard { animation: none; }
+  .peStackCard:nth-child(1) { transform: translate3d(-40px, 14px, 0) rotate(-6deg) scale(0.9); opacity: 0.5; }
+  .peStackCard:nth-child(2) { transform: none; opacity: 1; z-index: 3; }
+  .peStackCard:nth-child(3) { transform: translate3d(40px, 10px, 0) rotate(6deg) scale(0.92); opacity: 0.55; }
 }

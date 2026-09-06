@@ -6,7 +6,7 @@ import { calculateCreditCost } from "@/lib/credits";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { isModelRefusal } from "@/lib/refusal";
 
-type Tab = "konsola" | "konto" | "biblioteka" | "nauczyciel" | "admin";
+type Tab = "konsola" | "konto" | "nauczyciel" | "admin";
 type AdminView = "payouts" | "users" | "cost" | "systems" | "ratings";
 
 const ADMIN_VIEWS: { id: AdminView; l: string }[] = [
@@ -519,6 +519,7 @@ export default function PromptEngine() {
         const fol = await authFetch("/api/folders");
         setFolders(fol.folders || []);
         if (me.user.isAdmin) await loadAdminShell();
+        await loadLibrary();
       } catch (e: any) {
         if (String(e.message).includes("401") || String(e.message).includes("autoryz")) {
           window.location.href = "/login";
@@ -656,6 +657,7 @@ export default function PromptEngine() {
       setError(e.message || "Błąd generacji.");
     } finally {
       setBusy(false);
+      await loadLibrary();
     }
   }
 
@@ -955,14 +957,13 @@ export default function PromptEngine() {
         <span className="peTopBrand">PROMPT_ENGINE</span>
         <nav className="peTopNav">
           {(
-            ["konsola", "konto", "biblioteka", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
+            ["konsola", "konto", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
           ).map((t) => (
             <Chip
               key={t}
               active={tab === t}
               onClick={async () => {
                 setTab(t);
-                if (t === "biblioteka") await loadLibrary();
                 if (t === "nauczyciel") await loadTeacher();
                 if (t === "admin") await loadAdminShell();
                 if (t === "konto") await loadLedger();
@@ -1097,6 +1098,11 @@ export default function PromptEngine() {
               </div>
             </div>
 
+            <div className="peSession">
+            <div className="peStageHead">
+              <span className="peStageIndex">01</span>
+              <span className="peStageName">wejście</span>
+            </div>
             <div className="peWork">
             <div className="peCard peRail">
             {systemSlug === "n1" && mode === "prompt" ? (
@@ -1265,15 +1271,101 @@ export default function PromptEngine() {
               ))}
               {!blocks.length && !busy && (
                 <div className="peEmpty">
-                  <div className="peEmptyKicker">01 — canvas</div>
-                  <div className="peEmptyTitle">Ready when you are</div>
-                  Wrzuć inspiracje albo wklej prompt.
-                  <br />
-                  URUCHOM wypełni joby — jeden obraz, jeden slot.
+                  <div className="peStack" aria-hidden>
+                    <div className="peStackCard">01</div>
+                    <div className="peStackCard">02</div>
+                    <div className="peStackCard">03</div>
+                  </div>
+                  <p className="peEmptyHint">Po URUCHOM tu wpadają sloty — jeden obraz, jeden job.</p>
                 </div>
               )}
             </div>
             </div>
+            </div>
+
+            <section className="peSessionLib">
+              <div className="peStageHead">
+                <span className="peStageIndex">02</span>
+                <span className="peStageName">biblioteka · {library.length}</span>
+              </div>
+              <div className="peLibChips">
+                <Chip active={activeFolder === "all"} onClick={() => setActiveFolder("all")}>
+                  Wszystkie ({library.length})
+                </Chip>
+                <Chip active={activeFolder === "none"} onClick={() => setActiveFolder("none")}>
+                  Bez folderu
+                </Chip>
+                {folders.map((f) => (
+                  <Chip key={f.id} active={activeFolder === f.id} onClick={() => setActiveFolder(f.id)}>
+                    {f.name}
+                  </Chip>
+                ))}
+                <Chip active={false} onClick={() => setLibFolderOpen(true)}>
+                  + folder
+                </Chip>
+              </div>
+              <div className="peLibFeed">
+                {libFiltered.map((p) => {
+                  const copyText =
+                    p.format_mode === "together" && p.negative
+                      ? `${p.prompt}\n\nNegative prompt: ${p.negative}`
+                      : p.prompt;
+                  return (
+                    <article key={p.id} className="peCard peLibItem">
+                      {p.source_preview ? (
+                        <img src={p.source_preview} alt="" className="peLibThumb" />
+                      ) : (
+                        <div className="peLibThumb peLibThumbEmpty" />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                          <div style={{ fontSize: 12, color: T.muted }}>
+                            {p.created_at} · {p.word_count} słów
+                          </div>
+                          <button type="button" style={ghostBtn} onClick={() => navigator.clipboard.writeText(copyText)}>
+                            Kopiuj
+                          </button>
+                          <button
+                            type="button"
+                            style={ghostBtn}
+                            onClick={async () => {
+                              await authFetch(`/api/prompts/${p.id}`, { method: "DELETE" });
+                              await loadLibrary();
+                            }}
+                          >
+                            Usuń
+                          </button>
+                        </div>
+                        <select
+                          className="peField"
+                          value={p.folder_id || ""}
+                          onChange={async (e) => {
+                            const folderId = e.target.value || null;
+                            await authFetch(`/api/prompts/${p.id}`, {
+                              method: "PATCH",
+                              body: JSON.stringify({ folderId }),
+                            });
+                            await loadLibrary();
+                          }}
+                          style={{ marginTop: 8, width: "auto" }}
+                        >
+                          <option value="">Bez folderu</option>
+                          {folders.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.name}
+                            </option>
+                          ))}
+                        </select>
+                        <pre className="peMono" style={{ whiteSpace: "pre-wrap", fontSize: 13, margin: "10px 0 0" }}>
+                          {p.prompt}
+                        </pre>
+                      </div>
+                    </article>
+                  );
+                })}
+                {!libFiltered.length && <p style={{ color: T.muted, fontSize: 13 }}>Sesja pusta — po URUCHOM prompt wpadnie tu.</p>}
+              </div>
+            </section>
             </div>
           </>
         )}
@@ -1343,126 +1435,6 @@ export default function PromptEngine() {
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "biblioteka" && (
-          <div className="peLib">
-            <aside className="peCard" style={{ padding: 16 }}>
-              <div style={{ fontSize: 10, letterSpacing: "0.16em", color: T.muted, padding: "6px 8px 12px" }}>FOLDERY</div>
-              <Chip active={activeFolder === "all"} onClick={() => setActiveFolder("all")}>
-                WSZYSTKIE ({library.length})
-              </Chip>
-              <div style={{ height: 8 }} />
-              <Chip active={activeFolder === "none"} onClick={() => setActiveFolder("none")}>
-                BEZ FOLDERU
-              </Chip>
-              <div style={{ height: 8 }} />
-              {folders.map((f) => (
-                <div key={f.id} style={{ marginBottom: 8 }}>
-                  <Chip active={activeFolder === f.id} onClick={() => setActiveFolder(f.id)}>
-                    {f.name}
-                  </Chip>
-                </div>
-              ))}
-              <div style={{ height: 8 }} />
-              <Chip active={false} onClick={() => setLibFolderOpen(true)}>
-                + FOLDER
-              </Chip>
-            </aside>
-            <div style={{ padding: 16, overflow: "auto" }}>
-            {libFiltered.map((p) => {
-              const copyText =
-                p.format_mode === "together" && p.negative
-                  ? `${p.prompt}\n\nNegative prompt: ${p.negative}`
-                  : p.prompt;
-              return (
-                <article
-                  key={p.id}
-                  className="peCard"
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "flex-start",
-                    marginBottom: 12,
-                    padding: 12,
-                  }}
-                >
-                  {p.source_preview ? (
-                    <img
-                      src={p.source_preview}
-                      alt=""
-                      style={{ width: 72, height: 94, objectFit: "cover", border: `1px solid ${T.line2}`, flexShrink: 0 }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: 72,
-                        height: 94,
-                        flexShrink: 0,
-                        border: `1px dashed ${T.line2}`,
-                        background: T.panel2,
-                      }}
-                    />
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                      <div style={{ fontSize: 10, color: T.muted }}>
-                        {p.created_at} · {p.word_count} słów
-                      </div>
-                      <button
-                        type="button"
-                        style={ghostBtn}
-                        onClick={() => navigator.clipboard.writeText(copyText)}
-                      >
-                        KOPIUJ
-                      </button>
-                      <button
-                        type="button"
-                        style={ghostBtn}
-                        onClick={async () => {
-                          await authFetch(`/api/prompts/${p.id}`, { method: "DELETE" });
-                          await loadLibrary();
-                        }}
-                      >
-                        USUŃ
-                      </button>
-                    </div>
-                    <select
-                      value={p.folder_id || ""}
-                      onChange={async (e) => {
-                        const folderId = e.target.value || null;
-                        await authFetch(`/api/prompts/${p.id}`, {
-                          method: "PATCH",
-                          body: JSON.stringify({ folderId }),
-                        });
-                        await loadLibrary();
-                      }}
-                      style={{
-                        fontFamily: MONO,
-                        fontSize: 10,
-                        background: T.bg,
-                        color: T.text,
-                        border: `1px solid ${T.line2}`,
-                        marginTop: 8,
-                        padding: "3px 6px",
-                        colorScheme: "dark",
-                      }}
-                    >
-                      <option value="">Bez folderu</option>
-                      {folders.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                    </select>
-                    <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, margin: "8px 0 0" }}>{p.prompt}</pre>
-                  </div>
-                </article>
-              );
-            })}
-            {!libFiltered.length && <p style={{ color: T.muted, fontSize: 11 }}>Brak promptów.</p>}
             </div>
           </div>
         )}
