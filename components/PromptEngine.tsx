@@ -276,27 +276,35 @@ function imageToPreview(base64: string, mime: string): Promise<string | null> {
   });
 }
 
-function IdlePhoto({ variant }: { variant: "a" | "b" | "c" | "base" }) {
+function IdlePlate({
+  live,
+  ghost,
+  delay = "0s",
+}: {
+  live: string;
+  ghost?: string;
+  delay?: string;
+}) {
   return (
-    <div className={`peIdlePhoto peIdlePhoto--${variant}`}>
-      <span className="peIdleSky" />
-      <span className="peIdleFig" />
-      <span className="peIdleScan" />
+    <div className="peIdlePlate">
+      <img src={live} alt="" className="peIdleLive" />
+      {ghost ? <img src={ghost} alt="" className="peIdleGhost" style={{ animationDelay: delay }} /> : null}
+      <span className="peIdleScan" style={{ animationDelay: delay }} />
     </div>
   );
 }
 
-function IdleJobCard({ n, tag }: { n: string; tag?: string }) {
+function IdleJobCard({ n, tag, delay = "0s" }: { n: string; tag?: string; delay?: string }) {
   return (
-    <div className="peIdleJob">
+    <div className="peIdleJob" style={{ animationDelay: delay }}>
       <div className="peIdleJobHead">
         <span>{n}</span>
         {tag ? <span className="peIdleTag">{tag}</span> : null}
       </div>
-      <span className="peIdleLine" />
-      <span className="peIdleLine" />
-      <span className="peIdleLine peIdleLine--mid" />
-      <span className="peIdleLine peIdleLine--short" />
+      <span className="peIdleLine" style={{ animationDelay: delay }} />
+      <span className="peIdleLine" style={{ animationDelay: delay }} />
+      <span className="peIdleLine peIdleLine--mid" style={{ animationDelay: delay }} />
+      <span className="peIdleLine peIdleLine--short" style={{ animationDelay: delay }} />
     </div>
   );
 }
@@ -305,16 +313,17 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
   if (system === "s1") {
     return (
       <div className="peIdle peIdleS1" aria-hidden>
-        <div className="peIdleCol">
-          <IdlePhoto variant="base" />
-          <div className="peIdleTokens">
-            <span className="peIdleSwatch" />
-            <span className="peIdleSwatch" />
-            <span className="peIdleSwatch" />
-            <span className="peIdleToken">light</span>
-            <span className="peIdleToken">grain</span>
-            <span className="peIdleToken">cast</span>
-          </div>
+        <div className="peIdlePlate peIdlePlate--look">
+          <img src="/idle/r1-0.jpg" alt="" className="peIdleLive" />
+          <span className="peIdleGradeWash" />
+        </div>
+        <div className="peIdleTokens">
+          <span className="peIdleSwatch" />
+          <span className="peIdleSwatch" />
+          <span className="peIdleSwatch" />
+          <span className="peIdleToken">light</span>
+          <span className="peIdleToken">cast</span>
+          <span className="peIdleToken">grain</span>
         </div>
         <span className="peIdleFlow" />
         <IdleJobCard n="01" tag="look" />
@@ -324,30 +333,34 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
   if (system === "r1") {
     return (
       <div className="peIdle peIdleR1" aria-hidden>
-        <div className="peIdleCol peIdleCol--base">
-          <IdlePhoto variant="base" />
-        </div>
+        <IdlePlate live="/idle/r1-0.jpg" />
         <span className="peIdleFlow" />
-        <div className="peIdleSeries">
-          <IdleJobCard n="01" tag="pose" />
-          <IdleJobCard n="02" tag="face" />
-          <IdleJobCard n="03" tag="cam" />
+        <div className="peIdleFan">
+          <figure className="peIdleVar">
+            <img src="/idle/r1-1.jpg" alt="" />
+            <figcaption>pose</figcaption>
+          </figure>
+          <figure className="peIdleVar">
+            <img src="/idle/r1-2.jpg" alt="" />
+            <figcaption>face</figcaption>
+          </figure>
+          <figure className="peIdleVar">
+            <img src="/idle/r1-3.jpg" alt="" />
+            <figcaption>cam</figcaption>
+          </figure>
         </div>
       </div>
     );
   }
   return (
     <div className="peIdle peIdleN1" aria-hidden>
-      <div className="peIdleRefs">
-        <IdlePhoto variant="a" />
-        <IdlePhoto variant="b" />
-        <IdlePhoto variant="c" />
+      <div className="peIdleUnit">
+        <IdlePlate live="/idle/n1-kitchen.png" ghost="/idle/n1-kitchen-mask.png" />
+        <IdleJobCard n="01" delay="0.4s" />
       </div>
-      <span className="peIdleFlow" />
-      <div className="peIdleSlots">
-        <IdleJobCard n="01" />
-        <IdleJobCard n="02" />
-        <IdleJobCard n="03" />
+      <div className="peIdleUnit">
+        <IdlePlate live="/idle/n1-beach.jpg" ghost="/idle/n1-beach-mask.png" delay="-4.5s" />
+        <IdleJobCard n="02" delay="-4.1s" />
       </div>
     </div>
   );
