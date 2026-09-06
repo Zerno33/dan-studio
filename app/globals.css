@@ -50,17 +50,37 @@ input, textarea, select, button { font-family: inherit; }
   from { opacity: 0; transform: translateY(-22px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes peN1Fly {
-  0%, 100% { transform: translate(var(--ox), var(--oy)) scale(0.72); opacity: 0.45; }
-  50% { transform: translate(0, 0) scale(1); opacity: 0.95; }
+@keyframes peIdleScan {
+  0%, 18% { transform: translateY(-120%); opacity: 0; }
+  28%, 42% { opacity: 0.85; }
+  55% { transform: translateY(120%); opacity: 0; }
+  100% { transform: translateY(120%); opacity: 0; }
 }
-@keyframes peS1Wash {
-  0%, 100% { transform: translateX(-110%); opacity: 0.15; }
-  50% { transform: translateX(10%); opacity: 0.55; }
+@keyframes peIdleType {
+  0%, 12% { transform: scaleX(0.12); opacity: 0.2; }
+  28%, 72% { transform: scaleX(1); opacity: 1; }
+  88%, 100% { transform: scaleX(0.12); opacity: 0.2; }
 }
-@keyframes peR1Fan {
-  0%, 100% { transform: translateX(0) rotate(0deg); }
-  50% { transform: translateX(var(--fx)) rotate(var(--fr)); }
+@keyframes peIdleFocus {
+  0%, 8%, 92%, 100% { border-color: var(--pe-line2); box-shadow: none; filter: saturate(0.7); }
+  18%, 48% { border-color: rgba(229, 21, 42, 0.7); box-shadow: 0 0 22px rgba(229, 21, 42, 0.25); filter: saturate(1.15); }
+}
+@keyframes peIdleJobOn {
+  0%, 10%, 90%, 100% { opacity: 0.28; transform: translateY(8px); }
+  22%, 70% { opacity: 1; transform: translateY(0); }
+}
+@keyframes peIdleGrade {
+  0%, 100% { filter: saturate(0.85) hue-rotate(0deg); }
+  33% { filter: saturate(1.2) hue-rotate(-12deg); }
+  66% { filter: saturate(1.15) hue-rotate(18deg); }
+}
+@keyframes peIdlePop {
+  0%, 15%, 100% { opacity: 0.2; transform: translateY(6px) scale(0.92); }
+  28%, 70% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes peIdleSpawn {
+  0%, 12% { opacity: 0; transform: translateX(-18px) scale(0.92); }
+  24%, 100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 .peApp {
@@ -283,69 +303,162 @@ input, textarea, select, button { font-family: inherit; }
 .peJobGrid > .peJob:nth-child(4) { animation-delay: 0.2s; }
 .peJobGrid > .peJob:nth-child(n + 5) { animation-delay: 0.26s; }
 .peEmpty {
-  min-height: 280px;
+  min-height: 420px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--pe-muted);
-  font-size: 13px;
-  line-height: 1.6;
-  text-align: center;
-  padding: 36px 24px 28px;
+  padding: 28px 20px 32px;
 }
 .peJobGrid > .peEmpty { grid-column: 1 / -1; }
 .peIdle {
+  width: min(100%, 560px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+.peIdlePhoto {
   position: relative;
-  width: 220px;
-  height: 158px;
-}
-.peIdleShot,
-.peIdleFrame,
-.peIdlePortrait,
-.peIdleClone {
-  position: absolute;
-  border-radius: 10px;
-  border: 1px solid var(--pe-line2);
-  background: linear-gradient(180deg, #1a1a1a, #101010);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-}
-.peIdleN1 .peIdleShot {
-  width: 54px;
-  height: 70px;
-  animation: peN1Fly 4.8s ease-in-out infinite;
-}
-.peIdleN1 .peIdleShot:nth-child(1) { --ox: -78px; --oy: -18px; left: 84px; top: 44px; animation-delay: 0s; }
-.peIdleN1 .peIdleShot:nth-child(2) { --ox: 82px; --oy: -10px; left: 84px; top: 44px; animation-delay: -1.6s; }
-.peIdleN1 .peIdleShot:nth-child(3) { --ox: 0px; --oy: 48px; left: 84px; top: 44px; animation-delay: -3.2s; }
-.peIdleN1 .peIdleFrame {
-  width: 92px;
-  height: 118px;
-  left: 64px;
-  top: 18px;
-  border-color: rgba(229, 21, 42, 0.45);
-  background: transparent;
-}
-.peIdleS1 .peIdlePortrait {
-  inset: 12px 58px;
-}
-.peIdleS1 .peIdleWash {
-  position: absolute;
-  inset: 12px 58px;
-  border-radius: 10px;
-  background: linear-gradient(90deg, transparent, rgba(229, 21, 42, 0.55), transparent);
-  animation: peS1Wash 3.6s ease-in-out infinite;
-}
-.peIdleR1 .peIdleClone {
+  overflow: hidden;
   width: 72px;
   height: 96px;
-  left: 74px;
-  top: 28px;
-  animation: peR1Fan 3.8s ease-in-out infinite;
+  border-radius: 10px;
+  border: 1px solid var(--pe-line2);
+  background: #141414;
+  flex-shrink: 0;
 }
-.peIdleR1 .peIdleClone:nth-child(1) { --fx: -52px; --fr: -9deg; animation-delay: 0s; }
-.peIdleR1 .peIdleClone:nth-child(2) { --fx: 0px; --fr: 0deg; z-index: 2; animation-delay: -1.2s; }
-.peIdleR1 .peIdleClone:nth-child(3) { --fx: 52px; --fr: 9deg; animation-delay: -2.4s; }
+.peIdlePhoto--base { width: 92px; height: 122px; }
+.peIdlePhoto--a { background: linear-gradient(180deg, #2a2420, #121010); }
+.peIdlePhoto--b { background: linear-gradient(180deg, #1c2430, #0e1014); }
+.peIdlePhoto--c { background: linear-gradient(180deg, #241c22, #100e10); }
+.peIdleSky {
+  position: absolute;
+  inset: 0 0 42%;
+  opacity: 0.55;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(229, 21, 42, 0.22), transparent 70%);
+}
+.peIdlePhoto--b .peIdleSky { background: radial-gradient(120% 80% at 50% 0%, rgba(80, 120, 160, 0.28), transparent 70%); }
+.peIdlePhoto--c .peIdleSky { background: radial-gradient(120% 80% at 70% 10%, rgba(180, 140, 80, 0.22), transparent 70%); }
+.peIdleFig {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  width: 42%;
+  height: 52%;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle at 50% 14%, #4a4a4a 0 22%, transparent 24%),
+    linear-gradient(180deg, #3a3a3a 28%, #222 100%);
+  border-radius: 46% 46% 16% 16% / 28% 28% 18% 18%;
+  opacity: 0.95;
+}
+.peIdleScan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28%;
+  background: linear-gradient(180deg, transparent, rgba(229, 21, 42, 0.45), transparent);
+  animation: peIdleScan 9s ease-in-out infinite;
+  pointer-events: none;
+}
+.peIdleJob {
+  width: 132px;
+  padding: 8px 10px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--pe-line);
+  background: rgba(16, 16, 16, 0.94);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  text-align: left;
+}
+.peIdleJobHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--pe-red);
+  margin-bottom: 8px;
+}
+.peIdleTag {
+  color: var(--pe-muted);
+  letter-spacing: 0.08em;
+  font-size: 9px;
+}
+.peIdleLine {
+  display: block;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.16);
+  margin-bottom: 5px;
+  transform-origin: left center;
+  animation: peIdleType 9s ease-in-out infinite;
+}
+.peIdleLine--mid { width: 72%; }
+.peIdleLine--short { width: 44%; margin-bottom: 0; }
+.peIdleFlow {
+  width: 28px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--pe-red), transparent);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.peIdleRefs, .peIdleSlots, .peIdleSeries, .peIdleTokens {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.peIdleRefs, .peIdleSlots { flex-direction: column; }
+.peIdleN1 .peIdleRefs .peIdlePhoto { animation: peIdleFocus 9s ease-in-out infinite; }
+.peIdleN1 .peIdleRefs .peIdlePhoto:nth-child(1) { animation-delay: 0s; }
+.peIdleN1 .peIdleRefs .peIdlePhoto:nth-child(2) { animation-delay: -3s; }
+.peIdleN1 .peIdleRefs .peIdlePhoto:nth-child(3) { animation-delay: -6s; }
+.peIdleN1 .peIdleRefs .peIdlePhoto:nth-child(1) .peIdleScan { animation-delay: 0s; }
+.peIdleN1 .peIdleRefs .peIdlePhoto:nth-child(2) .peIdleScan { animation-delay: -3s; }
+.peIdleN1 .peIdleRefs .peIdlePhoto:nth-child(3) .peIdleScan { animation-delay: -6s; }
+.peIdleN1 .peIdleSlots .peIdleJob { animation: peIdleJobOn 9s ease-in-out infinite; }
+.peIdleN1 .peIdleSlots .peIdleJob:nth-child(1) { animation-delay: 0.35s; }
+.peIdleN1 .peIdleSlots .peIdleJob:nth-child(2) { animation-delay: -2.65s; }
+.peIdleN1 .peIdleSlots .peIdleJob:nth-child(3) { animation-delay: -5.65s; }
+.peIdleN1 .peIdleSlots .peIdleJob:nth-child(1) .peIdleLine { animation-delay: 0.5s; }
+.peIdleN1 .peIdleSlots .peIdleJob:nth-child(2) .peIdleLine { animation-delay: -2.5s; }
+.peIdleN1 .peIdleSlots .peIdleJob:nth-child(3) .peIdleLine { animation-delay: -5.5s; }
+
+.peIdleCol { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.peIdleS1 .peIdlePhoto--base { animation: peIdleGrade 8s ease-in-out infinite; }
+.peIdleS1 .peIdleScan { animation-duration: 8s; }
+.peIdleTokens { flex-wrap: wrap; justify-content: center; max-width: 120px; }
+.peIdleSwatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--pe-line2);
+  animation: peIdlePop 8s ease-in-out infinite;
+}
+.peIdleSwatch:nth-child(1) { background: #E5152A; }
+.peIdleSwatch:nth-child(2) { background: #c4a574; animation-delay: 0.15s; }
+.peIdleSwatch:nth-child(3) { background: #6a7d8a; animation-delay: 0.3s; }
+.peIdleToken {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--pe-muted);
+  border: 1px solid var(--pe-line2);
+  border-radius: 99px;
+  padding: 3px 7px;
+  animation: peIdlePop 8s ease-in-out infinite;
+}
+.peIdleToken:nth-child(4) { animation-delay: 0.45s; }
+.peIdleToken:nth-child(5) { animation-delay: 0.6s; }
+.peIdleToken:nth-child(6) { animation-delay: 0.75s; }
+.peIdleS1 .peIdleJob { animation: peIdleJobOn 8s ease-in-out infinite; animation-delay: 0.8s; }
+
+.peIdleR1 .peIdlePhoto--base { z-index: 2; }
+.peIdleSeries { flex-direction: column; }
+.peIdleR1 .peIdleJob { animation: peIdleSpawn 7.5s ease-in-out infinite; }
+.peIdleR1 .peIdleJob:nth-child(1) { animation-delay: 0.2s; }
+.peIdleR1 .peIdleJob:nth-child(2) { animation-delay: 0.7s; }
+.peIdleR1 .peIdleJob:nth-child(3) { animation-delay: 1.2s; }
+.peIdleR1 .peIdleJob .peIdleLine { animation-duration: 7.5s; }
 .peFilm {
   display: flex;
   gap: 12px;
@@ -606,8 +719,12 @@ input, textarea, select, button { font-family: inherit; }
   .peLoginBrand { border-right: none; border-bottom: 1px solid var(--pe-line); padding: 40px 24px; }
   .peLoginForm { padding: 40px 24px; }
 }
+@media (max-width: 720px) {
+  .peIdle { flex-wrap: wrap; }
+  .peIdleFlow { width: 1px; height: 18px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .peApp, .peJob, .peLibItem, .peBusyBar, .peFilmCard { animation: none; }
   .peBtnPrimary:not(:disabled) { animation: none; }
-  .peIdleShot, .peIdleWash, .peIdleClone { animation: none; }
+  .peIdleScan, .peIdleLine, .peIdlePhoto, .peIdleJob, .peIdleSwatch, .peIdleToken { animation: none !important; }
 }

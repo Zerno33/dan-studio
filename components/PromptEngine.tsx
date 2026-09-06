@@ -276,30 +276,79 @@ function imageToPreview(base64: string, mime: string): Promise<string | null> {
   });
 }
 
+function IdlePhoto({ variant }: { variant: "a" | "b" | "c" | "base" }) {
+  return (
+    <div className={`peIdlePhoto peIdlePhoto--${variant}`}>
+      <span className="peIdleSky" />
+      <span className="peIdleFig" />
+      <span className="peIdleScan" />
+    </div>
+  );
+}
+
+function IdleJobCard({ n, tag }: { n: string; tag?: string }) {
+  return (
+    <div className="peIdleJob">
+      <div className="peIdleJobHead">
+        <span>{n}</span>
+        {tag ? <span className="peIdleTag">{tag}</span> : null}
+      </div>
+      <span className="peIdleLine" />
+      <span className="peIdleLine" />
+      <span className="peIdleLine peIdleLine--mid" />
+      <span className="peIdleLine peIdleLine--short" />
+    </div>
+  );
+}
+
 function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
   if (system === "s1") {
     return (
       <div className="peIdle peIdleS1" aria-hidden>
-        <span className="peIdlePortrait" />
-        <span className="peIdleWash" />
+        <div className="peIdleCol">
+          <IdlePhoto variant="base" />
+          <div className="peIdleTokens">
+            <span className="peIdleSwatch" />
+            <span className="peIdleSwatch" />
+            <span className="peIdleSwatch" />
+            <span className="peIdleToken">light</span>
+            <span className="peIdleToken">grain</span>
+            <span className="peIdleToken">cast</span>
+          </div>
+        </div>
+        <span className="peIdleFlow" />
+        <IdleJobCard n="01" tag="look" />
       </div>
     );
   }
   if (system === "r1") {
     return (
       <div className="peIdle peIdleR1" aria-hidden>
-        <span className="peIdleClone" />
-        <span className="peIdleClone" />
-        <span className="peIdleClone" />
+        <div className="peIdleCol peIdleCol--base">
+          <IdlePhoto variant="base" />
+        </div>
+        <span className="peIdleFlow" />
+        <div className="peIdleSeries">
+          <IdleJobCard n="01" tag="pose" />
+          <IdleJobCard n="02" tag="face" />
+          <IdleJobCard n="03" tag="cam" />
+        </div>
       </div>
     );
   }
   return (
     <div className="peIdle peIdleN1" aria-hidden>
-      <span className="peIdleShot" />
-      <span className="peIdleShot" />
-      <span className="peIdleShot" />
-      <span className="peIdleFrame" />
+      <div className="peIdleRefs">
+        <IdlePhoto variant="a" />
+        <IdlePhoto variant="b" />
+        <IdlePhoto variant="c" />
+      </div>
+      <span className="peIdleFlow" />
+      <div className="peIdleSlots">
+        <IdleJobCard n="01" />
+        <IdleJobCard n="02" />
+        <IdleJobCard n="03" />
+      </div>
     </div>
   );
 }
@@ -1329,7 +1378,7 @@ export default function PromptEngine() {
               ))}
               {!blocks.length && !busy && (
                 <div className="peEmpty">
-                  <IdleCanvas system={systemSlug} />
+                  <IdleCanvas key={systemSlug} system={systemSlug} />
                 </div>
               )}
             </div>
