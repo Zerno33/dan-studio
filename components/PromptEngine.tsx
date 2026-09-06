@@ -1603,9 +1603,6 @@ export default function PromptEngine() {
                 </div>
                 <div style={{ fontSize: 13, color: T.muted, marginBottom: 16 }}>kredytów</div>
                 <div style={{ fontSize: 13, wordBreak: "break-all" }}>{email || "—"}</div>
-                <p style={{ fontSize: 13, color: T.muted, lineHeight: 1.7, margin: "16px 0 0" }}>
-                  Konsola zwraca tekst do kopiowania. Start: 10 kr. Ceny USD nie są tu pokazywane.
-                </p>
                 <a href="/terms" style={{ display: "inline-block", marginTop: 16, fontSize: 13 }}>
                   Terms of Use
                 </a>

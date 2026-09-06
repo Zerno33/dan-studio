@@ -88,18 +88,28 @@ input, textarea, select, button { font-family: inherit; }
   28%, 70% { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes peIdleR1Prompt {
-  0%, 16% { opacity: 0; transform: translateX(-10px); }
-  26%, 90% { opacity: 1; transform: translateX(0); }
+  0%, 18% { opacity: 0; transform: translateX(-10px); }
+  28%, 90% { opacity: 1; transform: translateX(0); }
   96%, 100% { opacity: 0; }
 }
 @keyframes peIdleR1Shot {
-  0%, 48% { opacity: 0; transform: translateX(-8px) scale(0.9); }
-  58%, 90% { opacity: 1; transform: translateX(0) scale(1); }
+  0%, 52% { opacity: 0; transform: translateX(-8px) scale(0.92); }
+  62%, 90% { opacity: 1; transform: translateX(0) scale(1); }
+  96%, 100% { opacity: 0; }
+}
+@keyframes peIdleR1Link {
+  0%, 52% { opacity: 0; }
+  62%, 90% { opacity: 0.7; }
+  96%, 100% { opacity: 0; }
+}
+@keyframes peIdleR1Spine {
+  0%, 18% { opacity: 0; }
+  28%, 90% { opacity: 1; }
   96%, 100% { opacity: 0; }
 }
 @keyframes peIdleR1Zoom {
-  0%, 38% { transform: scale(1.42) translate(12%, 0); }
-  52%, 100% { transform: scale(1) translate(0, 0); }
+  0%, 40% { transform: scale(1.22) translate(6%, 0); }
+  54%, 100% { transform: scale(1) translate(0, 0); }
 }
 @keyframes peIdleSpawn {
   0%, 12% { opacity: 0; transform: translateX(-18px) scale(0.92); }
@@ -507,7 +517,8 @@ input, textarea, select, button { font-family: inherit; }
 .peIdleS1 .peIdleJob { animation: peIdleJobOn 9s ease-in-out infinite; }
 .peIdleR1 {
   width: 100%;
-  min-height: 480px;
+  min-height: 520px;
+  height: 100%;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -516,13 +527,13 @@ input, textarea, select, button { font-family: inherit; }
 .peIdleR1Board {
   display: flex;
   align-items: center;
-  gap: 14px;
-  transform-origin: 18% 50%;
+  gap: 22px;
+  transform-origin: 16% 50%;
   animation: peIdleR1Zoom 14s ease-in-out infinite;
 }
 .peIdleR1 .peIdlePlate {
-  width: 152px;
-  height: 204px;
+  width: 248px;
+  height: 332px;
 }
 .peIdleR1 .peIdleGhost { animation-duration: 14s; }
 .peIdleR1 .peIdleScan { animation-duration: 14s; }
@@ -531,8 +542,8 @@ input, textarea, select, button { font-family: inherit; }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
-  padding-left: 14px;
+  gap: 14px;
+  padding-left: 18px;
 }
 .peIdleR1Tree::before {
   content: "";
@@ -542,25 +553,29 @@ input, textarea, select, button { font-family: inherit; }
   bottom: 12%;
   width: 1px;
   background: linear-gradient(180deg, transparent, var(--pe-red), transparent);
+  animation: peIdleR1Spine 14s ease-in-out infinite;
 }
 .peIdleR1Row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 .peIdleR1Row .peIdleJob {
-  width: 148px;
-  padding: 7px 8px 8px;
+  width: 196px;
+  padding: 10px 12px 12px;
   animation: peIdleR1Prompt 14s ease-in-out infinite;
 }
 .peIdleR1Row .peIdleLine { animation-duration: 14s; }
+.peIdleR1Row .peIdleFlow {
+  animation: peIdleR1Link 14s ease-in-out infinite;
+}
 .peIdleR1Row .peIdleVar {
-  width: 72px;
+  width: 118px;
   animation: peIdleR1Shot 14s ease-in-out infinite;
 }
 .peIdleR1Row .peIdleVar img {
-  width: 72px;
-  height: 96px;
+  width: 118px;
+  height: 158px;
 }
 .peIdleR1Row:nth-child(1) .peIdleJob { animation-delay: 0s; }
 .peIdleR1Row:nth-child(2) .peIdleJob { animation-delay: 0.16s; }
