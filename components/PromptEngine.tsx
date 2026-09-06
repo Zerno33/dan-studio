@@ -338,19 +338,9 @@ function IdlePlate({
   );
 }
 
-function IdleJobCard({
-  n,
-  tag,
-  delay = "0s",
-  className = "",
-}: {
-  n: string;
-  tag?: string;
-  delay?: string;
-  className?: string;
-}) {
+function IdleJobCard({ n, tag, delay = "0s" }: { n: string; tag?: string; delay?: string }) {
   return (
-    <div className={`peIdleJob${className ? ` ${className}` : ""}`} style={{ animationDelay: delay }}>
+    <div className="peIdleJob" style={{ animationDelay: delay }}>
       <div className="peIdleJobHead">
         <span>{n}</span>
         {tag ? <span className="peIdleTag">{tag}</span> : null}
@@ -364,9 +354,9 @@ function IdleJobCard({
 }
 
 const N1_IDLE_SCENES = [
+  { live: "/idle/n1-kitchen.png", ghost: "/idle/n1-kitchen-mask.png" },
+  { live: "/idle/n1-beach.jpg", ghost: "/idle/n1-beach-mask.png" },
   { live: "/idle/n1-sofa.png", ghost: "/idle/n1-sofa-mask.png" },
-  { live: "/idle/n1-room.png", ghost: "/idle/n1-room-mask.png" },
-  { live: "/idle/n1-sup.png", ghost: "/idle/n1-sup-mask.png" },
   { live: "/idle/n1-park.jpg", ghost: "/idle/n1-park-mask.png" },
 ] as const;
 
@@ -387,29 +377,27 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
           <span className="peIdleToken">grain</span>
         </div>
         <span className="peIdleFlow" />
-        <IdleJobCard n="S1" tag="look" />
+        <IdleJobCard n="01" tag="look" />
       </div>
     );
   }
   if (system === "r1") {
     return (
       <div className="peIdle peIdleR1" aria-hidden>
-        <div className="peIdleR1Board">
-          <div className="peIdleR1Hero">
-            <IdlePlate live="/idle/r1-0.jpg" ghost="/idle/r1-0.jpg" />
-            <IdleJobCard n="R1" className="peIdleJob--onHero" />
-          </div>
-          <div className="peIdleFan">
-            <figure className="peIdleVar">
-              <img src="/idle/r1-1.jpg" alt="" />
-            </figure>
-            <figure className="peIdleVar">
-              <img src="/idle/r1-2.jpg" alt="" />
-            </figure>
-            <figure className="peIdleVar">
-              <img src="/idle/r1-3.jpg" alt="" />
-            </figure>
-          </div>
+        <IdlePlate live="/idle/r1-0.jpg" />
+        <span className="peIdleFlow" />
+        <IdleJobCard n="R1" delay="0.35s" />
+        <span className="peIdleFlow" />
+        <div className="peIdleFan">
+          <figure className="peIdleVar">
+            <img src="/idle/r1-1.jpg" alt="" />
+          </figure>
+          <figure className="peIdleVar">
+            <img src="/idle/r1-2.jpg" alt="" />
+          </figure>
+          <figure className="peIdleVar">
+            <img src="/idle/r1-3.jpg" alt="" />
+          </figure>
         </div>
       </div>
     );
@@ -418,8 +406,10 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
     <div className="peIdle peIdleN1" aria-hidden>
       {N1_IDLE_SCENES.map((scene, i) => (
         <div key={scene.live} className="peIdleSlide">
-          <IdlePlate live={scene.live} ghost={scene.ghost} delay={`${i * 10}s`} />
-          <IdleJobCard n="N1" delay={`${i * 10}s`} />
+          <div className="peIdleUnit">
+            <IdlePlate live={scene.live} ghost={scene.ghost} delay={`${i * 9}s`} />
+            <IdleJobCard n="N1" delay={`${i * 9 + 0.4}s`} />
+          </div>
         </div>
       ))}
     </div>
