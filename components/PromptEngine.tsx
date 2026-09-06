@@ -169,32 +169,11 @@ function StudioModal({
   maxWidth?: number;
 }) {
   return (
-    <div
-      role="dialog"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.72)",
-        zIndex: 80,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth,
-          background: T.panel,
-          border: `1px solid ${T.line2}`,
-          padding: 16,
-          fontFamily: MONO,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red, marginBottom: 12 }}>{title}</div>
+    <div role="dialog" className="peModalScrim" onClick={onClose}>
+      <div className="peModal" style={{ maxWidth }} onClick={(e) => e.stopPropagation()}>
+        <div className="peLabel" style={{ color: T.red, marginBottom: 12 }}>
+          {title}
+        </div>
         {children}
       </div>
     </div>
@@ -310,28 +289,9 @@ function Chip({
   return (
     <button
       type="button"
-      className="peChip"
+      className={`peChip${active ? " isOn" : ""}${danger ? " isDanger" : ""}`}
       onClick={onClick}
-      style={{
-        fontFamily: MONO,
-        fontSize: 11,
-        letterSpacing: "0.06em",
-        color: active ? "#0A0A0A" : T.text,
-        background: active ? (danger ? T.red : "#FFFFFF") : "transparent",
-        border: `1px solid ${active ? "#FFFFFF" : T.line2}`,
-        padding: "4px 10px",
-        cursor: onClick ? "pointer" : "default",
-        transition: "transform 80ms ease, background 80ms ease",
-      }}
-      onMouseDown={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.97)";
-      }}
-      onMouseUp={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
-      }}
+      style={{ cursor: onClick ? "pointer" : "default" }}
     >
       {children}
     </button>
@@ -351,18 +311,10 @@ function Sel({
 }) {
   return (
     <select
+      className="peField"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      style={{
-        fontFamily: MONO,
-        fontSize: 11,
-        background: T.bg,
-        color: T.text,
-        border: `1px solid ${T.line2}`,
-        width,
-        padding: "4px 8px",
-        colorScheme: "dark",
-      }}
+      style={{ width }}
     >
       {options.map((o) => (
         <option key={o.v} value={o.v} style={{ background: T.bg, color: T.text }}>
@@ -373,9 +325,7 @@ function Sel({
   );
 }
 
-const Label = ({ children }: { children: ReactNode }) => (
-  <span style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em" }}>{children}</span>
-);
+const Label = ({ children }: { children: ReactNode }) => <span className="peLabel">{children}</span>;
 
 function OnboardingGuide({
   systems,
@@ -405,26 +355,15 @@ function OnboardingGuide({
   ];
   const s = steps[step];
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.78)",
-        zIndex: 90,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div style={{ width: "100%", maxWidth: 440, background: T.panel, border: `1px solid ${T.line2}`, padding: 20, fontFamily: MONO }}>
-        <div style={{ fontSize: 11, color: T.red, letterSpacing: "0.12em" }}>
+    <div className="peModalScrim" style={{ zIndex: 90 }}>
+      <div className="peModal" style={{ maxWidth: 440 }}>
+        <div className="peLabel" style={{ color: T.red }}>
           PIERWSZE WEJŚCIE {step + 1}/{steps.length}
         </div>
-        <h2 style={{ fontSize: 16, margin: "12px 0 8px" }}>{s.t}</h2>
-        <p style={{ fontSize: 13, lineHeight: 1.7, color: T.muted }}>{s.b}</p>
+        <h2 style={{ fontSize: 22, fontWeight: 600, margin: "12px 0 8px", letterSpacing: "-0.03em" }}>{s.t}</h2>
+        <p style={{ fontSize: 14, lineHeight: 1.7, color: T.muted }}>{s.b}</p>
         {step === 0 && (
-          <ul style={{ fontSize: 12, color: T.text, lineHeight: 1.8, paddingLeft: 18 }}>
+          <ul style={{ fontSize: 13, color: T.text, lineHeight: 1.8, paddingLeft: 18 }}>
             {systems.slice(0, 3).map((sys) => (
               <li key={sys.slug}>
                 <strong>{sys.label}</strong>
@@ -434,13 +373,13 @@ function OnboardingGuide({
           </ul>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "space-between" }}>
-          <button type="button" onClick={onDone} style={{ fontFamily: MONO, fontSize: 10, background: "none", border: "none", color: T.muted }}>
+          <button type="button" onClick={onDone} className="peBtn" style={{ border: "none" }}>
             POMIŃ
           </button>
           <button
             type="button"
             onClick={() => (step >= steps.length - 1 ? onDone() : setStep(step + 1))}
-            style={{ fontFamily: MONO, fontSize: 11, background: T.red, color: "#fff", border: "none", padding: "8px 14px" }}
+            className="peBtnPrimary"
           >
             {step >= steps.length - 1 ? "ROZUMIEM" : "DALEJ"}
           </button>
@@ -789,32 +728,20 @@ export default function PromptEngine() {
       : library.filter((p) => (activeFolder === "none" ? !p.folder_id : p.folder_id === activeFolder));
 
   const ghostBtn: CSSProperties = {
-    fontFamily: MONO,
-    fontSize: 10,
-    letterSpacing: "0.08em",
-    padding: "4px 10px",
+    fontSize: 12,
+    letterSpacing: "0.04em",
+    padding: "8px 14px",
     color: T.text,
     background: "transparent",
     border: `1px solid ${T.line2}`,
+    borderRadius: 999,
   };
 
   return (
-    <div style={{ background: T.bg, color: T.text, fontFamily: MONO, minHeight: "100vh" }}>
+    <div className="peApp">
       <style>{`
         @keyframes peSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         @keyframes pePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
-        .peKonto { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
-        @media (max-width: 860px) { .peKonto { grid-template-columns: 1fr; } }
-        .peAdminNavBtn:hover { color: #EDEDED !important; }
-        .peWork { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); min-height: calc(100vh - 118px); }
-        @media (max-width: 960px) { .peWork { grid-template-columns: 1fr; min-height: auto; } }
-        .peJobs { overflow: auto; min-height: 420px; }
-        .peJobGrid { display: flex; flex-direction: column; gap: 8px; }
-        @media (min-width: 1320px) { .peJobGrid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; } }
-        .peLib { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 0; min-height: calc(100vh - 86px); border: 1px solid #272727; }
-        @media (max-width: 860px) { .peLib { grid-template-columns: 1fr; } }
-        .peChip:hover { border-color: #EDEDED !important; }
-        .peBusyBar { height: 2px; background: linear-gradient(90deg, transparent, #E5152A, transparent); animation: peSweep 1.2s linear infinite; }
       `}</style>
       {showOnboard && <OnboardingGuide systems={systems} onDone={finishOnboarding} />}
       {libFolderOpen && (
@@ -1017,23 +944,9 @@ export default function PromptEngine() {
           </div>
         </StudioModal>
       )}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 16,
-          padding: "0 16px",
-          height: 52,
-          borderBottom: `1px solid ${T.line}`,
-          position: "sticky",
-          top: 0,
-          background: T.bg,
-          zIndex: 10,
-        }}
-      >
-        <span style={{ fontSize: 14, letterSpacing: "0.14em", color: T.red, flexShrink: 0 }}>PROMPT_ENGINE</span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1, minWidth: 0 }}>
+      <header className="peTop">
+        <span className="peTopBrand">PROMPT_ENGINE</span>
+        <nav className="peTopNav">
           {(
             ["konsola", "konto", "biblioteka", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
           ).map((t) => (
@@ -1053,34 +966,27 @@ export default function PromptEngine() {
                 : t.toUpperCase()}
             </Chip>
           ))}
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto" }}>
-          <span style={{ fontSize: 10, color: T.muted, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        </nav>
+        <div className="peTopUser">
+          <span style={{ fontSize: 12, color: T.muted, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {email}
             {isAdmin ? " · admin" : ""}
           </span>
-          <span
-            style={{
-              padding: "4px 10px",
-              fontSize: 11,
-              border: `1px solid ${T.line2}`,
-              color: (credits ?? 0) > 20 ? T.green : T.red,
-            }}
-          >
-            {credits ?? "—"} kredytów
+          <span className="peCredits" style={{ color: (credits ?? 0) > 20 ? T.green : T.red }}>
+            {credits ?? "—"} kr
           </span>
           <button
             type="button"
-            style={ghostBtn}
+            className="peBtn"
             onClick={async () => {
               await getSupabaseBrowser().then((s) => s.auth.signOut());
               window.location.href = "/login";
             }}
           >
-            WYLOGUJ
+            Wyloguj
           </button>
         </div>
-      </div>
+      </header>
 
       <div style={{ width: "100%", padding: tab === "konsola" ? 0 : "16px 20px", boxSizing: "border-box" }}>
         {loadErr && (
@@ -1091,19 +997,7 @@ export default function PromptEngine() {
 
         {tab === "konsola" && (
           <>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "12px 24px",
-                padding: 12,
-                marginBottom: 0,
-                border: "none",
-                borderBottom: `1px solid ${T.line}`,
-                background: T.panel,
-              }}
-            >
+            <div className="peToolbar">
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <Label>SYSTEM</Label>
                 <Sel
@@ -1189,17 +1083,7 @@ export default function PromptEngine() {
                   type="button"
                   onClick={generate}
                   disabled={busy}
-                  style={{
-                    fontFamily: MONO,
-                    fontSize: 12,
-                    letterSpacing: "0.1em",
-                    background: busy ? T.line2 : T.red,
-                    color: "#fff",
-                    border: "none",
-                    padding: "10px 22px",
-                    cursor: busy ? "wait" : "pointer",
-                    animation: busy ? "pePulse 1.1s ease-in-out infinite" : undefined,
-                  }}
+                  className="peBtnPrimary"
                 >
                   {busy ? "PRACUJE…" : "URUCHOM"}
                 </button>
@@ -1207,33 +1091,23 @@ export default function PromptEngine() {
             </div>
 
             <div className="peWork">
-            <div
-              style={{
-                borderRight: `1px solid ${T.line}`,
-                background: T.panel,
-                padding: 16,
-                display: "flex",
-                flexDirection: "column",
-                gap: 14,
-                minHeight: 0,
-              }}
-            >
+            <div className="peCard peRail">
             {systemSlug === "n1" && mode === "prompt" ? (
-              <div style={{ border: `1px solid ${T.line2}`, background: T.panel, marginBottom: 20 }}>
+              <div className="peCard" style={{ marginBottom: 8, overflow: "hidden" }}>
                 <textarea
                   value={pastedPrompt}
                   onChange={(e) => setPastedPrompt(e.target.value)}
                   placeholder="Wklej cudzy prompt. N1 zdejmie opis wyglądu i zostawi scenę 1:1."
+                  className="peMono"
                   style={{
                     width: "100%",
                     minHeight: 150,
                     background: "transparent",
                     color: T.text,
-                    fontFamily: MONO,
-                    fontSize: 12.5,
+                    fontSize: 13,
                     lineHeight: 1.7,
                     border: "none",
-                    padding: 12,
+                    padding: 14,
                     resize: "vertical",
                   }}
                 />
@@ -1247,11 +1121,12 @@ export default function PromptEngine() {
                   </Label>
                   {images.length > 0 && (
                     <button type="button" onClick={() => setImages([])} style={{ ...ghostBtn, color: T.red }}>
-                      WYCZYŚĆ
+                      Wyczyść
                     </button>
                   )}
                 </div>
                 <div
+                  className={`peDrop${dragOver ? " isOver" : ""}`}
                   onDragOver={(e) => {
                     e.preventDefault();
                     setDragOver(true);
@@ -1263,25 +1138,15 @@ export default function PromptEngine() {
                     const got = filesFromDrop(e.dataTransfer);
                     if (got.length) await addFiles(got);
                   }}
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 10,
-                    alignContent: "flex-start",
-                    minHeight: 240,
-                    padding: 12,
-                    border: `1px dashed ${dragOver ? T.red : T.line2}`,
-                    background: T.bg,
-                  }}
                 >
                   {images.map((img, i) => (
-                    <div key={img.id} style={{ position: "relative", width: 112, height: 146, border: `1px solid ${T.line2}` }}>
+                    <div key={img.id} className="peThumb">
                       <img
                         src={`data:${img.mime};base64,${img.base64}`}
                         alt=""
                         style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.9 }}
                       />
-                      <span style={{ position: "absolute", top: 4, left: 4, fontSize: 9, background: T.bg, color: T.red, padding: "0 4px" }}>
+                      <span style={{ position: "absolute", top: 4, left: 4, fontSize: 9, background: T.bg, color: T.red, padding: "0 4px", borderRadius: 6 }}>
                         {String(i + 1).padStart(2, "0")}
                       </span>
                       <button
@@ -1295,6 +1160,7 @@ export default function PromptEngine() {
                           background: T.bg,
                           color: T.muted,
                           border: "none",
+                          borderRadius: 6,
                         }}
                       >
                         ✕
@@ -1308,12 +1174,13 @@ export default function PromptEngine() {
                       style={{
                         width: images.length ? 112 : "100%",
                         height: images.length ? 146 : 216,
-                        border: `1px dashed ${dragOver ? T.red : T.line2}`,
-                        background: T.panel,
+                        border: `1px dashed ${dragOver ? T.red : "rgba(255,255,255,0.14)"}`,
+                        background: "transparent",
                         color: T.muted,
                         fontSize: images.length ? 20 : 13,
-                        letterSpacing: "0.08em",
+                        letterSpacing: "0.04em",
                         cursor: "pointer",
+                        borderRadius: 12,
                       }}
                     >
                       {images.length ? "+" : "Upuść zdjęcia albo Ctrl+V"}
@@ -1334,9 +1201,9 @@ export default function PromptEngine() {
               </div>
             )}
 
-            <div style={{ border: `1px solid ${T.line}`, background: T.panel }}>
-              <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.1em", padding: "8px 12px 0" }}>
-                BRIEF — opcjonalna notatka dla modelu. Przy S1 może zastąpić zdjęcie. Przy N1/R1 dodatek do wejścia.
+            <div className="peCard" style={{ overflow: "hidden" }}>
+              <div className="peLabel" style={{ padding: "10px 14px 0" }}>
+                BRIEF — opcjonalna notatka. S1 może zastąpić zdjęcie. N1/R1 = dodatek.
               </div>
               <textarea
                 value={brief}
@@ -1346,13 +1213,13 @@ export default function PromptEngine() {
                     ? "Opcjonalny kierunek serii…"
                     : "Np. złote światło, wieczór. Puste = pracuj wyłącznie na wejściu."
                 }
+                className="peMono"
                 style={{
                   width: "100%",
                   minHeight: 64,
                   background: "transparent",
                   color: T.text,
-                  fontFamily: MONO,
-                  fontSize: 12,
+                  fontSize: 13,
                   border: "none",
                   padding: 12,
                   resize: "vertical",
@@ -1360,34 +1227,24 @@ export default function PromptEngine() {
               />
             </div>
             {error && (
-              <div style={{ padding: 12, border: `1px solid ${T.red}`, color: T.red, fontSize: 11 }}>
+              <div className="peCard" style={{ padding: 12, borderColor: T.red, color: T.red, fontSize: 12 }}>
                 {error}
               </div>
             )}
             </div>
 
-            <div className="peJobs" style={{ display: "flex", flexDirection: "column", background: T.bg, minHeight: 0 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 16px",
-                  borderBottom: `1px solid ${T.line}`,
-                  background: T.panel,
-                  flexShrink: 0,
-                }}
-              >
-                <span style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red }}>
+            <div className="peCard peJobs">
+              <div className="peJobsHead">
+                <span className="peLabel" style={{ color: T.red }}>
                   JOBY
                   {blocks.length ? ` · ${blocks.filter((b) => !b.pending).length}/${blocks.length}` : ""}
                 </span>
-                <span style={{ fontSize: 11, color: T.muted }}>
+                <span style={{ fontSize: 12, color: T.muted }}>
                   {busy ? "pracuje…" : blocks.length ? `${blocks.filter((b) => b.error).length} blokad` : "pusto"}
                 </span>
               </div>
               {busy && <div className="peBusyBar" />}
-              <div className="peJobGrid" style={{ padding: 12, flex: 1 }}>
+              <div className="peJobGrid">
               {blocks.map((b, i) => (
                 <ResultCard
                   key={b.id || `slot-${i}`}
@@ -1400,24 +1257,10 @@ export default function PromptEngine() {
                 />
               ))}
               {!blocks.length && !busy && (
-                <div
-                  style={{
-                    minHeight: 280,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: `1px solid ${T.line}`,
-                    background: T.panel,
-                    color: T.muted,
-                    fontSize: 12,
-                    lineHeight: 1.8,
-                    textAlign: "center",
-                    padding: 32,
-                  }}
-                >
-                  Lewa szyna: wrzuć inspiracje albo wklej prompt.
+                <div className="peEmpty">
+                  Wrzuć inspiracje albo wklej prompt.
                   <br />
-                  URUCHOM zapełni tę kolumnę slotami — jeden obraz = jeden job.
+                  URUCHOM zapełni canvas — jeden obraz = jeden job.
                 </div>
               )}
             </div>
@@ -1429,32 +1272,32 @@ export default function PromptEngine() {
         {tab === "konto" && (
           <div>
             <div className="peKonto">
-              <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 20 }}>
-                <div style={{ fontSize: 10, letterSpacing: "0.16em", color: T.muted }}>SALDO</div>
-                <div style={{ fontSize: 42, lineHeight: 1.1, margin: "12px 0 8px", color: (credits ?? 0) > 20 ? T.green : T.red }}>
+              <div className="peCard" style={{ padding: 24 }}>
+                <div className="peLabel">SALDO</div>
+                <div className="peBalance" style={{ color: (credits ?? 0) > 20 ? T.green : T.red }}>
                   {credits ?? "—"}
                 </div>
-                <div style={{ fontSize: 12, color: T.muted, marginBottom: 16 }}>kredytów</div>
-                <div style={{ fontSize: 12, wordBreak: "break-all" }}>{email || "—"}</div>
-                <p style={{ fontSize: 12, color: T.muted, lineHeight: 1.7, margin: "16px 0 0" }}>
+                <div style={{ fontSize: 13, color: T.muted, marginBottom: 16 }}>kredytów</div>
+                <div style={{ fontSize: 13, wordBreak: "break-all" }}>{email || "—"}</div>
+                <p style={{ fontSize: 13, color: T.muted, lineHeight: 1.7, margin: "16px 0 0" }}>
                   Konsola zwraca tekst do kopiowania. Start: 10 kr. Ceny USD nie są tu pokazywane.
                 </p>
-                <a href="/terms" style={{ display: "inline-block", marginTop: 16, fontSize: 11, color: T.red }}>
+                <a href="/terms" style={{ display: "inline-block", marginTop: 16, fontSize: 13 }}>
                   Terms of Use
                 </a>
               </div>
-              <div style={{ border: `1px solid ${T.line}`, background: T.panel, minHeight: 320 }}>
+              <div className="peCard" style={{ minHeight: 320, overflow: "hidden" }}>
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "baseline",
-                    padding: "14px 16px",
+                    padding: "16px 18px",
                     borderBottom: `1px solid ${T.line}`,
                   }}
                 >
-                  <span style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red }}>ZUŻYCIE</span>
-                  <span style={{ fontSize: 11, color: T.muted }}>
+                  <span className="peLabel" style={{ color: T.red }}>ZUŻYCIE</span>
+                  <span style={{ fontSize: 12, color: T.muted }}>
                     {ledgerBusy
                       ? "ładuję…"
                       : `${creditLedger.filter((r) => r.reason === "generation").length} gen · ${creditLedger
@@ -1463,27 +1306,17 @@ export default function PromptEngine() {
                   </span>
                 </div>
                 {ledgerBusy && !creditLedger.length && (
-                  <div style={{ padding: 16, color: T.muted, fontSize: 12, animation: "pePulse 1.1s ease-in-out infinite" }}>
+                  <div style={{ padding: 16, color: T.muted, fontSize: 13, animation: "pePulse 1.1s ease-in-out infinite" }}>
                     Wczytuję historię…
                   </div>
                 )}
                 {!ledgerBusy && creditLedger.length === 0 && (
-                  <div style={{ padding: 16, color: T.muted, fontSize: 12, lineHeight: 1.7 }}>
+                  <div style={{ padding: 16, color: T.muted, fontSize: 13, lineHeight: 1.7 }}>
                     Tu pojawi się historia kredytów po pierwszej generacji albo doładowaniu.
                   </div>
                 )}
                 {creditLedger.map((row) => (
-                  <div
-                    key={row.id}
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      alignItems: "baseline",
-                      padding: "10px 16px",
-                      borderBottom: `1px solid ${T.line}`,
-                      fontSize: 12,
-                    }}
-                  >
+                  <div key={row.id} className="peLedgerRow">
                     <span style={{ width: 132, flexShrink: 0, color: T.muted }}>{formatLedgerWhen(row.at)}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       {creditReasonLabel(row)}
@@ -1507,7 +1340,7 @@ export default function PromptEngine() {
 
         {tab === "biblioteka" && (
           <div className="peLib">
-            <aside style={{ borderRight: `1px solid ${T.line}`, background: T.panel2, padding: 12 }}>
+            <aside className="peCard" style={{ padding: 16 }}>
               <div style={{ fontSize: 10, letterSpacing: "0.16em", color: T.muted, padding: "6px 8px 12px" }}>FOLDERY</div>
               <Chip active={activeFolder === "all"} onClick={() => setActiveFolder("all")}>
                 WSZYSTKIE ({library.length})
@@ -1538,12 +1371,11 @@ export default function PromptEngine() {
               return (
                 <article
                   key={p.id}
+                  className="peCard"
                   style={{
                     display: "flex",
                     gap: 12,
                     alignItems: "flex-start",
-                    border: `1px solid ${T.line}`,
-                    background: T.panel,
                     marginBottom: 12,
                     padding: 12,
                   }}
@@ -1628,8 +1460,8 @@ export default function PromptEngine() {
 
         {tab === "nauczyciel" && referralCode && (
           <div className="peKonto">
-            <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.red, marginBottom: 12 }}>AFILIACJA</div>
+            <div className="peCard" style={{ padding: 20 }}>
+              <div className="peLabel" style={{ color: T.red, marginBottom: 12 }}>AFILIACJA</div>
               <p style={{ fontSize: 13, lineHeight: 1.7, color: T.muted }}>
                 Kod: <span style={{ color: T.text }}>{referralCode}</span>
                 <br />
@@ -1705,8 +1537,8 @@ export default function PromptEngine() {
                 <div style={{ fontSize: 11, color: T.muted, marginTop: 8, lineHeight: 1.5 }}>{payoutMsg}</div>
               )}
             </div>
-            <div style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 11, letterSpacing: "0.12em", color: T.muted, marginBottom: 12 }}>HISTORIA WYPŁAT</div>
+            <div className="peCard" style={{ padding: 20 }}>
+              <div className="peLabel" style={{ marginBottom: 12 }}>HISTORIA WYPŁAT</div>
               {!(teacherStats?.payoutHistory || []).length && (
                 <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>Tu widać datę i kwotę, gdy przelew jest zakończony.</p>
               )}
@@ -1749,63 +1581,41 @@ export default function PromptEngine() {
         )}
 
         {tab === "admin" && isAdmin && (
-          <section
-            style={{
-              display: "flex",
-              minHeight: "calc(100vh - 52px)",
-              border: `1px solid ${T.line}`,
-              background: T.panel,
-            }}
-          >
-            <aside
-              style={{
-                width: 188,
-                flexShrink: 0,
-                borderRight: `1px solid ${T.line}`,
-                background: T.panel2,
-                padding: "12px 10px",
-              }}
-            >
-              <div style={{ fontSize: 10, letterSpacing: "0.16em", color: T.muted, padding: "6px 8px 14px" }}>ADMIN</div>
+          <section className="peCard peAdmin">
+            <aside className="peAdminNav">
+              <div className="peLabel" style={{ padding: "6px 8px 14px" }}>ADMIN</div>
               {ADMIN_VIEWS.map((v) => {
                 const open = v.id === "payouts" ? payouts.filter((p) => p.status !== "done").length : 0;
                 return (
                   <button
                     key={v.id}
                     type="button"
+                    className={`peAdminNavBtn${adminView === v.id ? " isOn" : ""}`}
                     onClick={() => setAdminView(v.id)}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      fontFamily: MONO,
-                      fontSize: 11,
-                      letterSpacing: "0.08em",
-                      padding: "10px 10px",
-                      marginBottom: 4,
-                      cursor: "pointer",
-                      color: adminView === v.id ? T.text : T.muted,
-                      background: adminView === v.id ? T.bg : "transparent",
-                      border: `1px solid ${adminView === v.id ? T.red : "transparent"}`,
-                    }}
                   >
                     {open ? `${v.l} · ${open}` : v.l}
                   </button>
                 );
               })}
             </aside>
-            <div style={{ flex: 1, minWidth: 0, padding: 20 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: 24 }}>
             {adminView === "payouts" && (
               <>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>WYPŁATY</h2>
-            <div style={{ fontSize: 16, margin: "8px 0 6px", color: T.green }}>
-              ${Number(payoutCashflow?.owedTotalUsd ?? 0).toFixed(2)} USD winne łącznie
+            <div className="peMetrics">
+              <div className="peCard peMetric">
+                <span className="peLabel">WINNE</span>
+                <b style={{ color: T.green }}>${Number(payoutCashflow?.owedTotalUsd ?? 0).toFixed(2)}</b>
+              </div>
+              <div className="peCard peMetric">
+                <span className="peLabel">TICKETY</span>
+                <b>{payouts.filter((p) => p.status !== "done").length}</b>
+              </div>
             </div>
-            <p style={{ fontSize: 11, color: T.muted, marginBottom: 12, lineHeight: 1.6 }}>
-              Ticket od nauczyciela (ZLEĆ WYPŁATĘ). Status: pending → w drodze → zakończono.
+            <p style={{ fontSize: 13, color: T.muted, marginBottom: 12, lineHeight: 1.6 }}>
+              Ticket od nauczyciela. Status: pending → w drodze → zakończono.
             </p>
             <button type="button" style={{ ...ghostBtn, marginBottom: 16 }} onClick={() => setPayoutHistoryOpen(true)}>
-              HISTORIA WYPŁAT
+              Historia wypłat
             </button>
             {payoutLoadErr && (
               <p style={{ fontSize: 11, color: T.red, marginBottom: 12 }}>{payoutLoadErr}</p>
@@ -1817,20 +1627,7 @@ export default function PromptEngine() {
             {payouts
               .filter((p) => p.status !== "done")
               .map((p) => (
-                <div
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    alignItems: "center",
-                    border: `1px solid ${T.line}`,
-                    background: T.panel,
-                    padding: 10,
-                    marginBottom: 8,
-                    fontSize: 12,
-                  }}
-                >
+                <div key={p.id} className="peCard peRow">
                   <span>{p.email}</span>
                   <span style={{ color: T.green }}>${Number(p.requestedUsd || p.owedUsd || 0).toFixed(2)}</span>
                   <select
@@ -1868,20 +1665,7 @@ export default function PromptEngine() {
               ZAPROŚ MAILEM
             </button>
             {adminUsers.map((u) => (
-              <div
-                key={u.id}
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  alignItems: "center",
-                  border: `1px solid ${T.line}`,
-                  background: T.panel,
-                  padding: 10,
-                  marginBottom: 8,
-                  fontSize: 12,
-                }}
-              >
+              <div key={u.id} className="peCard peRow">
                 <span>{u.email}</span>
                 <span style={{ color: T.muted, fontSize: 10 }}>kod {u.referral_code || "—"}</span>
                 <span style={{ color: T.muted, fontSize: 10 }}>od {u.referred_by || "—"}</span>
@@ -1939,13 +1723,23 @@ export default function PromptEngine() {
 
             {adminView === "cost" && (
               <>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>KOSZT</h2>
-            <div style={{ fontSize: 12, color: T.muted, marginBottom: 8 }}>
-              USD {costSummary?.summary?.totalCostUsd ?? "—"} · kredyty {costSummary?.summary?.totalCreditsSpent ?? "—"}
-              {costSummary?.summary?.blendMarginPct != null ? ` · marża ${costSummary.summary.blendMarginPct}%` : ""}
-              {costSummary?.summary?.marginWarning ? " · UWAGA marża < 40%" : ""}
+            <div className="peMetrics">
+              <div className="peCard peMetric">
+                <span className="peLabel">USD</span>
+                <b>{costSummary?.summary?.totalCostUsd ?? "—"}</b>
+              </div>
+              <div className="peCard peMetric">
+                <span className="peLabel">KREDYTY</span>
+                <b>{costSummary?.summary?.totalCreditsSpent ?? "—"}</b>
+              </div>
+              <div className="peCard peMetric">
+                <span className="peLabel">MARŻA</span>
+                <b style={{ color: costSummary?.summary?.marginWarning ? T.red : T.green }}>
+                  {costSummary?.summary?.blendMarginPct != null ? `${costSummary.summary.blendMarginPct}%` : "—"}
+                </b>
+              </div>
             </div>
-            <p style={{ fontSize: 11, color: T.muted, margin: "0 0 8px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: T.muted, margin: "0 0 12px", lineHeight: 1.5 }}>
               Suma za dzień, nie godzina pojedynczej generacji.
             </p>
             {(costSummary?.daily || []).slice(0, 14).map((d: { day: string; cost_usd?: number; credits_spent?: number }) => (
@@ -1991,7 +1785,7 @@ export default function PromptEngine() {
               <>
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>OCENY</h2>
             {Object.entries(ratingsSummary).map(([k, v]) => (
-              <div key={k} style={{ border: `1px solid ${T.line}`, padding: 10, marginBottom: 8, fontSize: 12 }}>
+              <div key={k} className="peCard peRow" style={{ display: "block" }}>
                 <b>{k}</b> · {v.pass}/{v.total} PASS
                 <div style={{ color: T.muted, fontSize: 11, marginTop: 4 }}>
                   {Object.entries(v.tags)
@@ -2009,7 +1803,7 @@ export default function PromptEngine() {
               <>
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>SYSTEMY</h2>
             {adminSystems.map((s) => (
-              <article key={s.id} style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 12, marginBottom: 12 }}>
+              <article key={s.id} className="peCard" style={{ padding: 16, marginBottom: 12 }}>
                 <b>
                   {s.label} ({s.slug})
                 </b>{" "}
@@ -2088,13 +1882,13 @@ function ResultCard({
   const words = block.prompt.trim().split(/\s+/).filter(Boolean).length;
   const full = block.negative ? `${block.prompt}\n\nNegative prompt: ${block.negative}` : block.prompt;
   const ghostBtn: CSSProperties = {
-    fontFamily: MONO,
-    fontSize: 10,
-    letterSpacing: "0.08em",
-    padding: "4px 10px",
+    fontSize: 12,
+    letterSpacing: "0.04em",
+    padding: "8px 14px",
     color: T.text,
     background: "transparent",
     border: `1px solid ${T.line2}`,
+    borderRadius: 999,
   };
 
   async function assignFolder(folderId: string) {
@@ -2129,7 +1923,7 @@ function ResultCard({
   }
 
   return (
-    <div style={{ marginBottom: 0, height: "100%", border: `1px solid ${T.line}`, background: T.panel }}>
+    <div className={`peJob${block.pending ? " isPending" : ""}`}>
       {folderModal && (
         <StudioModal title="NOWY FOLDER" onClose={() => !folderBusy && setFolderModal(false)}>
           <input
@@ -2262,7 +2056,7 @@ function ResultCard({
         <div style={{ padding: 12, fontSize: 11, color: T.red, lineHeight: 1.6 }}>{block.error}</div>
       ) : (
         <>
-      <pre style={{ padding: 12, whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.75, margin: 0 }}>{block.prompt}</pre>
+      <pre className="peMono" style={{ padding: 12, whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.75, margin: 0 }}>{block.prompt}</pre>
       {block.negative && formatMode === "together" && (
         <div style={{ padding: "0 12px 12px" }}>
           <div style={{ fontSize: 10, color: T.muted, letterSpacing: "0.14em", marginBottom: 4 }}>NEGATIVE</div>

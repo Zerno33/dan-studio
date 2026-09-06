@@ -1,16 +1,60 @@
 ---
-description: BRNS sprint flow — HTML raport, Linear epic, dev preview, review, Mati tests
+description: BRNS sprint flow — conversation is spec; Linear is work log
 alwaysApply: true
 ---
 
-# Flow pracy PROMPT_ENGINE
+# Flow PROMPT_ENGINE
 
-1. Mati wrzuca **HTML** (bugi / UX / backlog oddzielnie).
-2. Agent składa **jeden epic Linear** + kolejka w opisie. Dzieci tylko gdy już istnieją (np. MYS-69).
-3. Kod na gałęzi **`dev`**. High / Agent. Nie merge `main`. Polar, plugin, gen obrazów, MCP, BYOK = backlog.
-4. Push → Preview Ready na stałym URL: `https://dan-studio-git-dev-mati30141-4082s-projects.vercel.app` (nie unikalny deploy).
-5. Review kodu i klików. Debug w **tym samym** epicu, bez nowego HTML.
-6. Testy Mati (admin) + Kojot (nauczyciel) na git-dev.
-7. Wynik testów = **nowy HTML** → wracamy do pkt 2. Nie zamykać epica przed smoke Mati.
+## Źródło prawdy vs Linear
 
-Paleta: `#0A0A0A` / `#E5152A` / mono. Inspo layoutu: mało podwidoków; las buttonów z mockupu odrzucamy.
+**Co budujemy** = ta konwersacja z Mati (HTML + chat + inspo). Ticket w Linear **nie nadpisuje** czatu.
+
+**Linear** = ewidencja, nie spec:
+- update postępu (co zrobione / co padło / co Mati odrzucił)
+- czas wykonania sprintu
+- log błędów procesu, żeby kolejny agent się uczył
+- most przez ograniczony kontekst czatu
+
+W ticketcie: krótki log pracy. Nie przepisywać wymagań z czatu do Linear jako „prawdy”. Gdy ticket i chat się rozjeżdżają — wygrywa chat.
+
+### Jak budować ticket (obowiązkowy szablon)
+
+**Opis** = dashboard (zawsze aktualny). **Komentarz** = jeden event, data CEST, nie edytować historii.
+
+```
+# EWIDENCJA — nie spec
+Źródło: czat Mati + HTML [sekcja]. Gdy chat ≠ ticket → chat.
+
+## TERAZ
+status + blokada Done (tylko smoke Mati)
+
+## CZAS (CEST)
+- HH:MM — event (created / push hash / reject / interrupt)
+
+## SHIP
+fakt na `dev` (nie oznacza Done)
+
+## REJECT / BŁĘDY PROCESU
+co Mati odrzucił; co agent spartolił (trening)
+
+## NEXT AGENT
+1–5 zdań. Czytać czat. Nie zamykać.
+Preview: stały git-dev URL
+```
+
+Zasady: sprint = 1 ticket na boardzie (nie chować jako dziecko Backlog). Dziecko tylko na istniejącą kolejkę w sprincie. Po pushu / rejectcie / interruptcie — komentarz z godziną + update **TERAZ** i **CZAS**. Nigdy „zrobione” w tytule/opisie przed smoke.
+
+HTML Mati ma sekcje. Każda sekcja = **osobny sprint** (tydzień dewa ≈ 1h agenta). Nie mieszać.
+
+1. **POPRAWKI BACKED** → Sprint A (bugi, kredyty, API). Linear: MYS-71.
+2. **UX/UI + inspo** → Sprint B **na końcu**, po A na preview. Decyzje z obrazków: co bierzemy / co odrzucamy. Linear: MYS-72.
+3. **BEZPIECZEŃSTWO** = odpowiedź w tickecie, nie budowa.
+4. **BACKLOG** = osobny epic albo zostaje backlog (Polar, plugin, MCP, gen obrazów).
+
+Kolejność w sprincie: kod `dev` → push git-dev → review → debug → smoke Mati → nowy HTML. Nie zamykać przed smoke.
+
+Preview: `https://dan-studio-git-dev-mati30141-4082s-projects.vercel.app`. Nie merge `main`.
+
+Linear: jeden sprint = jeden ticket z kolejką. Dzieci tylko istniejące. Checklista nie jest Done dopóki Mati nie kliknie. Update w Linear po pushu / po review / po rejectcie Mati.
+
+Inspo: paleta `#0A0A0A` / `#E5152A` / mono. Las buttonów z mockupu odrzucamy. Nie udawać UI sprintem bugów.
