@@ -281,7 +281,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 .peJobs {
   overflow: hidden;
-  min-height: 360px;
+  min-height: 480px;
   display: flex;
   flex-direction: column;
   background: rgba(8, 8, 8, 0.45);
@@ -315,7 +315,7 @@ input, textarea, select, button { font-family: inherit; }
 .peJobGrid > .peJob:nth-child(4) { animation-delay: 0.2s; }
 .peJobGrid > .peJob:nth-child(n + 5) { animation-delay: 0.26s; }
 .peEmpty {
-  min-height: 480px;
+  min-height: 560px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -324,7 +324,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 .peJobGrid > .peEmpty { grid-column: 1 / -1; }
 .peIdle {
-  width: min(100%, 760px);
+  width: min(100%, 920px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -333,8 +333,8 @@ input, textarea, select, button { font-family: inherit; }
   position: relative;
 }
 .peIdleN1 {
-  width: min(100%, 520px);
-  min-height: 280px;
+  width: min(100%, 760px);
+  min-height: 430px;
   display: block;
 }
 .peIdleSlide {
@@ -353,7 +353,7 @@ input, textarea, select, button { font-family: inherit; }
 .peIdleUnit {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 .peIdlePlate {
   position: relative;
@@ -365,6 +365,10 @@ input, textarea, select, button { font-family: inherit; }
   background: #111;
   flex-shrink: 0;
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4);
+}
+.peIdleN1 .peIdlePlate {
+  width: 288px;
+  height: 386px;
 }
 .peIdlePlate--look { width: 196px; height: 262px; }
 .peIdleLive,
@@ -444,7 +448,12 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
 }
 .peIdleTokens { flex-wrap: wrap; justify-content: center; max-width: 120px; }
-.peIdleN1 .peIdleJob { animation: peIdleJobOn 9s ease-in-out infinite; }
+.peIdleN1 .peIdleJob {
+  width: 220px;
+  padding: 14px 16px 16px;
+  animation: peIdleJobOn 9s ease-in-out infinite;
+}
+.peIdleN1 .peIdleLine { height: 5px; margin-bottom: 7px; }
 .peIdleSwatch {
   width: 14px;
   height: 14px;
@@ -468,7 +477,33 @@ input, textarea, select, button { font-family: inherit; }
 .peIdleToken:nth-child(5) { animation-delay: 0.6s; }
 .peIdleToken:nth-child(6) { animation-delay: 0.75s; }
 .peIdleS1 .peIdleJob { animation: peIdleJobOn 8s ease-in-out infinite; animation-delay: 0.8s; }
-.peIdleR1 .peIdleJob { animation: peIdleJobOn 7.5s ease-in-out infinite; animation-delay: 0.2s; }
+.peIdleR1 {
+  flex-wrap: nowrap;
+  width: min(100%, 920px);
+  gap: 18px;
+}
+.peIdleR1Cols {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.peIdleR1Pair {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 124px;
+}
+.peIdleR1 .peIdleJob {
+  width: 100%;
+  padding: 8px 9px 9px;
+  animation: peIdleJobOn 7.5s ease-in-out infinite;
+}
+.peIdleR1Pair:nth-child(1) .peIdleJob { animation-delay: 0.2s; }
+.peIdleR1Pair:nth-child(2) .peIdleJob { animation-delay: 0.45s; }
+.peIdleR1Pair:nth-child(3) .peIdleJob { animation-delay: 0.7s; }
+.peIdleR1Pair:nth-child(1) .peIdleVar { animation-delay: 0.85s; }
+.peIdleR1Pair:nth-child(2) .peIdleVar { animation-delay: 1.15s; }
+.peIdleR1Pair:nth-child(3) .peIdleVar { animation-delay: 1.45s; }
 .peIdleFan {
   display: flex;
   gap: 8px;
@@ -479,9 +514,7 @@ input, textarea, select, button { font-family: inherit; }
   width: 104px;
   animation: peIdleSpawn 7.5s ease-in-out infinite;
 }
-.peIdleVar:nth-child(1) { animation-delay: 0.15s; }
-.peIdleVar:nth-child(2) { animation-delay: 0.55s; }
-.peIdleVar:nth-child(3) { animation-delay: 0.95s; }
+.peIdleR1Pair .peIdleVar { width: 100%; }
 .peIdleVar img {
   display: block;
   width: 104px;
@@ -489,6 +522,10 @@ input, textarea, select, button { font-family: inherit; }
   object-fit: cover;
   border-radius: 10px;
   border: 1px solid var(--pe-line2);
+}
+.peIdleR1Pair .peIdleVar img {
+  width: 100%;
+  height: 156px;
 }
 .peFilm {
   display: flex;

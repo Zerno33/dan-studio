@@ -386,18 +386,25 @@ function IdleCanvas({ system }: { system: "n1" | "s1" | "r1" }) {
       <div className="peIdle peIdleR1" aria-hidden>
         <IdlePlate live="/idle/r1-0.jpg" />
         <span className="peIdleFlow" />
-        <IdleJobCard n="R1" delay="0.35s" />
-        <span className="peIdleFlow" />
-        <div className="peIdleFan">
-          <figure className="peIdleVar">
-            <img src="/idle/r1-1.jpg" alt="" />
-          </figure>
-          <figure className="peIdleVar">
-            <img src="/idle/r1-2.jpg" alt="" />
-          </figure>
-          <figure className="peIdleVar">
-            <img src="/idle/r1-3.jpg" alt="" />
-          </figure>
+        <div className="peIdleR1Cols">
+          <div className="peIdleR1Pair">
+            <IdleJobCard n="R1" delay="0.2s" />
+            <figure className="peIdleVar">
+              <img src="/idle/r1-1.jpg" alt="" />
+            </figure>
+          </div>
+          <div className="peIdleR1Pair">
+            <IdleJobCard n="R1" delay="0.45s" />
+            <figure className="peIdleVar">
+              <img src="/idle/r1-2.jpg" alt="" />
+            </figure>
+          </div>
+          <div className="peIdleR1Pair">
+            <IdleJobCard n="R1" delay="0.7s" />
+            <figure className="peIdleVar">
+              <img src="/idle/r1-3.jpg" alt="" />
+            </figure>
+          </div>
         </div>
       </div>
     );
