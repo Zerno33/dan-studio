@@ -5,6 +5,13 @@ import { isMissingNoteColumn, parsePayoutNoteUsd, parsePaidAt, roundUsd } from "
 
 export const dynamic = "force-dynamic";
 
+function maskEmail(email: string | null | undefined): string {
+  if (!email || !email.includes("@")) return email || "—";
+  const [user, domain] = email.split("@");
+  const head = user.slice(0, 1) || "?";
+  return `${head}***@${domain}`;
+}
+
 export async function GET(req: NextRequest) {
   const user = await requireUser(req);
   if (!user) return NextResponse.json({ error: "Brak autoryzacji." }, { status: 401 });
@@ -59,7 +66,7 @@ export async function GET(req: NextRequest) {
     const p = byId.get(r.user_id);
     return {
       id: r.id,
-      email: p?.email || "—",
+      email: maskEmail(p?.email || "—"),
       status: p?.is_banned ? "inactive" : r.status,
       commission: Number(r.commission_accrued || 0),
       created_at: r.created_at,
@@ -77,7 +84,7 @@ export async function GET(req: NextRequest) {
   }
   const extras = extraPeople.map((p) => ({
     id: p.id,
-    email: p.email || "—",
+    email: maskEmail(p.email || "—"),
     status: p.is_banned ? "inactive" : "active",
     commission: extraComm.get(p.id) ?? 0,
     created_at: "",

@@ -9,7 +9,7 @@
 
 import { SupabaseClient } from "@supabase/supabase-js";
 
-const MAX_REQUESTS_PER_MINUTE = 10;
+const MAX_REQUESTS_PER_MINUTE = 20;
 const MAX_REQUESTS_PER_HOUR = 100;
 
 const MAX_IMAGE_BYTES = 1.2 * 1024 * 1024;
@@ -72,7 +72,7 @@ export function validateImages(
     total += size;
   }
   if (total > MAX_TOTAL_IMAGE_BYTES) {
-    return { ok: false, error: "Suma zdjęć za duża na jeden strzał (limit Vercel ~4 MB). Daj 5–6 na raz albo mniejsze pliki." };
+    return { ok: false, error: "Suma zdjęć za duża na jeden strzał. Daj 5–6 na raz albo mniejsze pliki." };
   }
   return { ok: true };
 }

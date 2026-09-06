@@ -47,8 +47,8 @@ function resolveProviderModel(productModel: string): { url: string; key: string;
   if (!key) {
     throw new Error(
       isGrok
-        ? "Brak XAI_API_KEY i OPENAI_API_KEY — nie da się wywołać modelu."
-        : "Brak OPENAI_API_KEY (i LiteLLM nie jest skonfigurowany)."
+        ? "Model chwilowo niedostępny. Wybierz inny albo spróbuj później."
+        : "Model chwilowo niedostępny. Spróbuj później."
     );
   }
 
@@ -77,10 +77,10 @@ export function userFacingLlmError(err: unknown): string {
     return "Grok nie przyjął zdjęcia. Na N1 ze zdjęciem wybierz GPT (Luna/Terra).";
   }
   if (msg.startsWith("LLM_HTTP_401") || msg.startsWith("LLM_HTTP_403")) {
-    return "Klucz modelu odrzucony. Sprawdź OPENAI_API_KEY / XAI_API_KEY na Vercel.";
+    return "Model chwilowo niedostępny. Spróbuj inny model albo wróć za chwilę.";
   }
   if (msg.startsWith("LLM_HTTP_404") || msg.startsWith("LLM_HTTP_400")) {
-    return "Model niedostępny u providera. Ustaw OPENAI_MODEL_LUNA / XAI_MODEL_43 na działającą nazwę.";
+    return "Ten model jest teraz niedostępny. Wybierz Luna, Terra albo inny Grok.";
   }
   if (msg.startsWith("LLM_HTTP_429")) return "Limit zapytań u providera. Poczekaj chwilę.";
   return "Błąd połączenia z modelem.";

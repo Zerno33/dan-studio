@@ -71,6 +71,17 @@ NEGATIVE: [treść po angielsku lub "-" jeśli instrukcja systemu nie przewiduje
 Jeden obraz/wariant = jeden blok.`;
 
 // ---------- parsowanie bloków ----------
+function isModelRefusal(raw: string): boolean {
+  const t = raw.toLowerCase();
+  return (
+    t.includes("can't assist") ||
+    t.includes("cannot assist") ||
+    t.includes("i’m sorry, i can’t") ||
+    t.includes("i'm sorry, i can't") ||
+    t.includes("i cannot help with that")
+  );
+}
+
 function parseBlocks(raw: string): PromptBlock[] {
   const out: PromptBlock[] = [];
   const re = /<<<BLOCK>>>([\s\S]*?)<<<END>>>/g;
@@ -264,7 +275,7 @@ export async function POST(req: NextRequest) {
   try {
     const llm = await chatCompletions({
       model: modelToUse,
-      maxTokens: body.systemSlug === "r1" ? 800 : 4000,
+      maxTokens: body.systemSlug === "r1" ? 800 : body.systemSlug === "n1" && (body.images?.length ?? 0) <= 1 ? 900 : 4000,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content },
@@ -286,6 +297,20 @@ export async function POST(req: NextRequest) {
   }
 
   const blocks = parseBlocks(raw);
+  if (isModelRefusal(raw) || (blocks.length === 1 && isModelRefusal(blocks[0].prompt))) {
+    await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
+    await supabaseAdmin.from("credit_transactions").insert({
+      user_id: userId,
+      delta: 0,
+      reason: "generation_failed",
+      system_id: system.id,
+      model: modelToUse,
+    });
+    return NextResponse.json(
+      { error: "I'm sorry, I can't assist with this request.", refusal: true },
+      { status: 422 }
+    );
+  }
   if (!blocks.length) {
     await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
     await supabaseAdmin.from("credit_transactions").insert({

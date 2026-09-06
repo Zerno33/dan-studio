@@ -29,6 +29,7 @@ export default function LoginPage() {
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
   const [recovery, setRecovery] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("ref");
@@ -69,7 +70,7 @@ export default function LoginPage() {
         });
         if (authError) throw authError;
         if (!data.session) {
-          setInfo("Konto utworzone. Jeśli Supabase wymaga potwierdzenia — otwórz maila, potem wróć i kliknij Zaloguj.");
+          setInfo("Konto utworzone. Jeśli przyjdzie mail z potwierdzeniem — otwórz go, potem wróć i kliknij Zaloguj.");
           return;
         }
       } else {
@@ -148,7 +149,10 @@ export default function LoginPage() {
       <main style={{ maxWidth: 420, margin: "80px auto", padding: 24 }}>
         <h1 style={{ color: "#E5152A" }}>USTAW HASŁO</h1>
         <p style={{ color: "#8A8A8A", fontSize: 13 }}>Zaproszenie albo reset — wymyśl hasło (min. 6 znaków), potem wejdziesz na konsolę.</p>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nowe hasło" style={field} />
+        <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="nowe hasło" style={field} />
+        <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ ...btn, background: "transparent", color: "#8A8A8A", marginTop: 8 }}>
+          {showPassword ? "Ukryj hasło" : "Pokaż hasło"}
+        </button>
         {error && <p style={{ color: "#ff6b6b" }}>{error}</p>}
         <button disabled={busy} onClick={saveNewPassword} style={btn}>
           Zapisz
@@ -162,7 +166,10 @@ export default function LoginPage() {
       <h1 style={{ color: "#E5152A" }}>PROMPT_ENGINE</h1>
       <p>Zaloguj się, żeby korzystać z konsoli.</p>
       <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" style={field} />
-      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="hasło" style={field} />
+      <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="hasło" style={field} />
+      <button type="button" onClick={() => setShowPassword((v) => !v)} style={{ background: "none", border: "none", color: "#8A8A8A", fontSize: 12, padding: "6px 0", cursor: "pointer" }}>
+        {showPassword ? "Ukryj hasło" : "Pokaż hasło"}
+      </button>
       <label style={{ display: "flex", gap: 8, margin: "12px 0", fontSize: 13 }}>
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         Potwierdzam prawa do wrzucanych materiałów i akceptuję{" "}

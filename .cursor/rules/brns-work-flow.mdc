@@ -1,0 +1,16 @@
+---
+description: BRNS sprint flow — HTML raport, Linear epic, dev preview, review, Mati tests
+alwaysApply: true
+---
+
+# Flow pracy PROMPT_ENGINE
+
+1. Mati wrzuca **HTML** (bugi / UX / backlog oddzielnie).
+2. Agent składa **jeden epic Linear** + kolejka w opisie. Dzieci tylko gdy już istnieją (np. MYS-69).
+3. Kod na gałęzi **`dev`**. High / Agent. Nie merge `main`. Polar, plugin, gen obrazów, MCP, BYOK = backlog.
+4. Push → Preview Ready na stałym URL: `https://dan-studio-git-dev-mati30141-4082s-projects.vercel.app` (nie unikalny deploy).
+5. Review kodu i klików. Debug w **tym samym** epicu, bez nowego HTML.
+6. Testy Mati (admin) + Kojot (nauczyciel) na git-dev.
+7. Wynik testów = **nowy HTML** → wracamy do pkt 2. Nie zamykać epica przed smoke Mati.
+
+Paleta: `#0A0A0A` / `#E5152A` / mono. Inspo layoutu: mało podwidoków; las buttonów z mockupu odrzucamy.

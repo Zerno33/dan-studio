@@ -5,7 +5,17 @@ import { ALLOWED_MODELS } from "@/lib/models";
 import { calculateCreditCost } from "@/lib/credits";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
-type Tab = "konsola" | "pomoc" | "biblioteka" | "nauczyciel" | "admin";
+type Tab = "konsola" | "konto" | "biblioteka" | "nauczyciel" | "admin";
+type AdminView = "payouts" | "users" | "cost" | "systems" | "ratings";
+
+const ADMIN_VIEWS: { id: AdminView; l: string }[] = [
+  { id: "payouts", l: "WYPŁATY" },
+  { id: "users", l: "USERZY" },
+  { id: "cost", l: "KOSZT" },
+  { id: "systems", l: "SYSTEMY" },
+  { id: "ratings", l: "OCENY" },
+];
+
 type PublicSystem = {
   id: string;
   slug: "n1" | "s1" | "r1";
@@ -67,13 +77,31 @@ function uniqueImageFiles(files: File[]) {
   const seen = new Set<string>();
   const out: File[] = [];
   for (const f of files) {
-    if (f.type && !f.type.startsWith("image/")) continue;
-    const key = `${f.size}:${f.type || "image"}`;
+    const looksImage =
+      !f.type ||
+      f.type.startsWith("image/") ||
+      f.type === "application/octet-stream" ||
+      /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(f.name);
+    if (!looksImage) continue;
+    const key = `${f.size}:${f.name || f.type || "image"}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(f);
   }
   return out;
+}
+
+function filesFromDrop(dt: DataTransfer): File[] {
+  const raw: File[] = [];
+  if (dt.files?.length) raw.push(...Array.from(dt.files));
+  if (dt.items?.length) {
+    for (const it of Array.from(dt.items)) {
+      if (it.kind !== "file") continue;
+      const f = it.getAsFile();
+      if (f) raw.push(f);
+    }
+  }
+  return uniqueImageFiles(raw);
 }
 
 function filesForOnePaste(files: File[]) {
@@ -195,7 +223,29 @@ function fileToImage(file: File): Promise<{ id: string; base64: string; mime: st
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Nie udało się odczytać pliku."));
+      const reader = new FileReader();
+      reader.onload = () => {
+        const probe = new Image();
+        probe.onload = () => {
+          const max = 1280;
+          const scale = Math.min(1, max / Math.max(probe.width, probe.height, 1));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(probe.width * scale));
+          canvas.height = Math.max(1, Math.round(probe.height * scale));
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Nie udało się zmniejszyć zdjęcia."));
+            return;
+          }
+          ctx.drawImage(probe, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+          resolve({ id: Math.random().toString(36).slice(2, 10), base64: dataUrl.split(",")[1] || "", mime: "image/jpeg" });
+        };
+        probe.onerror = () => reject(new Error("Nie udało się odczytać pliku."));
+        probe.src = String(reader.result || "");
+      };
+      reader.onerror = () => reject(new Error("Nie udało się odczytać pliku."));
+      reader.readAsDataURL(file);
     };
     img.src = url;
   });
@@ -246,6 +296,17 @@ function Chip({
         background: active ? (danger ? T.red : "#FFFFFF") : "transparent",
         border: `1px solid ${active ? "#FFFFFF" : T.line2}`,
         padding: "4px 10px",
+        cursor: onClick ? "pointer" : "default",
+        transition: "transform 80ms ease, background 80ms ease",
+      }}
+      onMouseDown={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.97)";
+      }}
+      onMouseUp={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
       }}
     >
       {children}
@@ -422,7 +483,9 @@ export default function PromptEngine() {
   const [formatMode, setFormatMode] = useState<"together" | "separate">("together");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [blocks, setBlocks] = useState<{ id?: string; prompt: string; negative: string }[]>([]);
+  const [blocks, setBlocks] = useState<
+    { id?: string; prompt: string; negative: string; preview?: string | null; error?: string; pending?: boolean }[]
+  >([]);
   const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
   const [library, setLibrary] = useState<any[]>([]);
   const [activeFolder, setActiveFolder] = useState("all");
@@ -440,8 +503,9 @@ export default function PromptEngine() {
   const [adminModal, setAdminModal] = useState<null | { kind: "credits" | "ref"; userId: string; email: string; value: string }>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteCredits, setInviteCredits] = useState("50");
+  const [inviteCredits, setInviteCredits] = useState("10");
   const [payoutHistoryOpen, setPayoutHistoryOpen] = useState(false);
+  const [adminView, setAdminView] = useState<AdminView>("payouts");
 
   const current = systems.find((s) => s.slug === systemSlug);
   const isR1 = systemSlug === "r1";
@@ -544,24 +608,78 @@ export default function PromptEngine() {
     try {
       if (!systems.length) throw new Error("Brak systemów. Seed N1/S1/R1 w bazie.");
       const sourcePreviews = await Promise.all(images.map((img) => imageToPreview(img.base64, img.mime)));
-      const json = await authFetch("/api/generate", {
-        method: "POST",
-        body: JSON.stringify({
-          systemSlug,
-          mode: systemSlug === "n1" ? mode : undefined,
-          images: images.map(({ base64, mime }) => ({ base64, mime })),
-          sourcePreviews,
-          pastedPrompt,
-          brief,
-          variant: isR1 ? variant : undefined,
-          count: isR1 ? count : undefined,
-          lengthMode: isR1 ? undefined : lengthMode,
-          modelOverride: modelOverride || undefined,
-          formatMode,
-        }),
-      });
-      setBlocks(json.blocks || []);
-      if (typeof json.creditsRemaining === "number") setCredits(json.creditsRemaining);
+      const n1Batch = systemSlug === "n1" && mode === "img" && images.length > 0;
+      if (n1Batch) {
+        const slots = images.map((img, i) => ({
+          prompt: "",
+          negative: "",
+          preview: sourcePreviews[i] || `data:${img.mime};base64,${img.base64}`,
+          pending: true,
+        }));
+        setBlocks(slots);
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          try {
+            const json = await authFetch("/api/generate", {
+              method: "POST",
+              body: JSON.stringify({
+                systemSlug,
+                mode: "img",
+                images: [{ base64: img.base64, mime: img.mime }],
+                sourcePreviews: [sourcePreviews[i]],
+                brief,
+                lengthMode,
+                modelOverride: modelOverride || undefined,
+                formatMode,
+              }),
+            });
+            const b = json.blocks?.[0];
+            setBlocks((prev) => {
+              const next = [...prev];
+              next[i] = {
+                id: b?.id,
+                prompt: b?.prompt || "",
+                negative: b?.negative || "",
+                preview: slots[i].preview,
+                pending: false,
+              };
+              return next;
+            });
+            if (typeof json.creditsRemaining === "number") setCredits(json.creditsRemaining);
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Błąd slotu.";
+            setBlocks((prev) => {
+              const next = [...prev];
+              next[i] = { prompt: "", negative: "", preview: slots[i].preview, pending: false, error: msg };
+              return next;
+            });
+          }
+        }
+      } else {
+        const json = await authFetch("/api/generate", {
+          method: "POST",
+          body: JSON.stringify({
+            systemSlug,
+            mode: systemSlug === "n1" ? mode : undefined,
+            images: images.map(({ base64, mime }) => ({ base64, mime })),
+            sourcePreviews,
+            pastedPrompt,
+            brief,
+            variant: isR1 ? variant : undefined,
+            count: isR1 ? count : undefined,
+            lengthMode: isR1 ? undefined : lengthMode,
+            modelOverride: modelOverride || undefined,
+            formatMode,
+          }),
+        });
+        setBlocks(
+          (json.blocks || []).map((b: { id?: string; prompt: string; negative: string }, i: number) => ({
+            ...b,
+            preview: sourcePreviews[i] || sourcePreviews[0] || null,
+          }))
+        );
+        if (typeof json.creditsRemaining === "number") setCredits(json.creditsRemaining);
+      }
     } catch (e: any) {
       setError(e.message || "Błąd generacji.");
     } finally {
@@ -644,6 +762,10 @@ export default function PromptEngine() {
 
   return (
     <div style={{ background: T.bg, color: T.text, fontFamily: MONO, minHeight: "100vh" }}>
+      <style>{`
+        @keyframes peSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        @keyframes pePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+      `}</style>
       {showOnboard && <OnboardingGuide systems={systems} onDone={finishOnboarding} />}
       {libFolderOpen && (
         <StudioModal title="NOWY FOLDER" onClose={() => setLibFolderOpen(false)}>
@@ -869,7 +991,7 @@ export default function PromptEngine() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {(
-            ["konsola", "pomoc", "biblioteka", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
+            ["konsola", "konto", "biblioteka", ...(referralCode ? (["nauczyciel"] as const) : []), ...(isAdmin ? (["admin"] as const) : [])] as Tab[]
           ).map((t) => (
             <Chip
               key={t}
@@ -1023,6 +1145,8 @@ export default function PromptEngine() {
                     color: "#fff",
                     border: "none",
                     padding: "8px 20px",
+                    cursor: busy ? "wait" : "pointer",
+                    animation: busy ? "pePulse 1.1s ease-in-out infinite" : undefined,
                   }}
                 >
                   {busy ? "PRACUJE…" : "URUCHOM"}
@@ -1072,7 +1196,8 @@ export default function PromptEngine() {
                   onDrop={async (e) => {
                     e.preventDefault();
                     setDragOver(false);
-                    if (e.dataTransfer.files?.length) await addFiles(e.dataTransfer.files);
+                    const got = filesFromDrop(e.dataTransfer);
+                    if (got.length) await addFiles(got);
                   }}
                   style={{ display: "flex", flexWrap: "wrap", gap: 12 }}
                 >
@@ -1168,10 +1293,10 @@ export default function PromptEngine() {
               </div>
             )}
 
-            <div style={{ marginTop: 32 }}>
+            <div style={{ marginTop: 24, display: "grid", gap: 10 }}>
               {blocks.map((b, i) => (
                 <ResultCard
-                  key={b.id || i}
+                  key={b.id || `slot-${i}`}
                   index={i + 1}
                   block={b}
                   formatMode={formatMode}
@@ -1200,12 +1325,29 @@ export default function PromptEngine() {
           </>
         )}
 
-        {tab === "pomoc" && (
-          <div>
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.red }}>JAK TO DZIAŁA</h2>
-            <p style={{ color: T.muted, fontSize: 13, lineHeight: 1.7, maxWidth: 640 }}>
-              Wynik to prompt tekstowy do kopiowania, nie wygenerowany obraz. Brief to opcjonalna notatka dla modelu.
-            </p>
+        {tab === "konto" && (
+          <div style={{ maxWidth: 640 }}>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.red }}>KONTO</h2>
+            <div
+              style={{
+                border: `1px solid ${T.line}`,
+                background: T.panel,
+                padding: 16,
+                margin: "12px 0 20px",
+              }}
+            >
+              <div style={{ fontSize: 13 }}>{email || "—"}</div>
+              <div style={{ fontSize: 22, margin: "10px 0 4px", color: (credits ?? 0) > 20 ? T.green : T.red }}>
+                {credits ?? "—"} kr
+              </div>
+              <p style={{ fontSize: 12, color: T.muted, lineHeight: 1.7, margin: 0 }}>
+                Nowe konto startuje z 10 kredytami. Wynik w konsoli to tekst do kopiowania, nie wygenerowany obraz.
+              </p>
+              <a href="/terms" style={{ display: "inline-block", marginTop: 12, fontSize: 11, color: T.red }}>
+                Terms of Use
+              </a>
+            </div>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>SYSTEMY</h2>
             {systems.map((s) => (
               <article key={s.slug} style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 14, marginTop: 12 }}>
                 <div style={{ fontSize: 13, color: T.text }}>
@@ -1457,6 +1599,17 @@ export default function PromptEngine() {
 
         {tab === "admin" && isAdmin && (
           <section>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+              {ADMIN_VIEWS.map((v) => (
+                <Chip key={v.id} active={adminView === v.id} onClick={() => setAdminView(v.id)}>
+                  {v.id === "payouts" && payouts.filter((p) => p.status !== "done").length
+                    ? `${v.l} · ${payouts.filter((p) => p.status !== "done").length}`
+                    : v.l}
+                </Chip>
+              ))}
+            </div>
+            {adminView === "payouts" && (
+              <>
             <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>WYPŁATY</h2>
             <div style={{ fontSize: 16, margin: "8px 0 6px", color: T.green }}>
               ${Number(payoutCashflow?.owedTotalUsd ?? 0).toFixed(2)} USD winne łącznie
@@ -1518,7 +1671,12 @@ export default function PromptEngine() {
                 </div>
               ))}
 
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>USERZY</h2>
+              </>
+            )}
+
+            {adminView === "users" && (
+              <>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>USERZY</h2>
             <button type="button" style={{ ...ghostBtn, marginBottom: 10 }} onClick={() => setInviteOpen(true)}>
               ZAPROŚ MAILEM
             </button>
@@ -1591,7 +1749,12 @@ export default function PromptEngine() {
               </div>
             ))}
 
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>KOSZT</h2>
+              </>
+            )}
+
+            {adminView === "cost" && (
+              <>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>KOSZT</h2>
             <div style={{ fontSize: 12, color: T.muted, marginBottom: 8 }}>
               USD {costSummary?.summary?.totalCostUsd ?? "—"} · kredyty {costSummary?.summary?.totalCreditsSpent ?? "—"}
               {costSummary?.summary?.blendMarginPct != null ? ` · marża ${costSummary.summary.blendMarginPct}%` : ""}
@@ -1636,7 +1799,12 @@ export default function PromptEngine() {
               <p style={{ color: T.muted, fontSize: 11 }}>Brak generacji z modelem w tym okresie.</p>
             )}
 
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>OCENY</h2>
+              </>
+            )}
+
+            {adminView === "ratings" && (
+              <>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>OCENY</h2>
             {Object.entries(ratingsSummary).map(([k, v]) => (
               <div key={k} style={{ border: `1px solid ${T.line}`, padding: 10, marginBottom: 8, fontSize: 12 }}>
                 <b>{k}</b> · {v.pass}/{v.total} PASS
@@ -1649,7 +1817,12 @@ export default function PromptEngine() {
             ))}
             {!Object.keys(ratingsSummary).length && <p style={{ color: T.muted, fontSize: 11 }}>Brak ocen.</p>}
 
-            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted, marginTop: 28 }}>SYSTEMY</h2>
+              </>
+            )}
+
+            {adminView === "systems" && (
+              <>
+            <h2 style={{ fontSize: 12, letterSpacing: "0.12em", color: T.muted }}>SYSTEMY</h2>
             {adminSystems.map((s) => (
               <article key={s.id} style={{ border: `1px solid ${T.line}`, background: T.panel, padding: 12, marginBottom: 12 }}>
                 <b>
@@ -1697,6 +1870,8 @@ export default function PromptEngine() {
                 )}
               </article>
             ))}
+              </>
+            )}
           </section>
         )}
       </div>
@@ -1713,7 +1888,7 @@ function ResultCard({
   onAssigned,
 }: {
   index: number;
-  block: { id?: string; prompt: string; negative: string };
+  block: { id?: string; prompt: string; negative: string; preview?: string | null; error?: string; pending?: boolean };
   formatMode: "together" | "separate";
   folders: { id: string; name: string }[];
   onFolders: (f: { id: string; name: string }[]) => void;
@@ -1768,7 +1943,7 @@ function ResultCard({
   }
 
   return (
-    <div style={{ marginBottom: 16, border: `1px solid ${T.line}`, background: T.panel }}>
+    <div style={{ marginBottom: 8, border: `1px solid ${T.line}`, background: T.panel }}>
       {folderModal && (
         <StudioModal title="NOWY FOLDER" onClose={() => !folderBusy && setFolderModal(false)}>
           <input
@@ -1805,6 +1980,42 @@ function ResultCard({
           </div>
         </StudioModal>
       )}
+      <div style={{ display: "flex", alignItems: "stretch" }}>
+        {(block.preview || block.pending || block.error) && (
+          <div
+            style={{
+              width: 72,
+              flexShrink: 0,
+              position: "relative",
+              overflow: "hidden",
+              borderRight: `1px solid ${T.line}`,
+              background: T.panel2,
+            }}
+          >
+            {block.preview ? (
+              <img
+                src={block.preview}
+                alt=""
+                style={{ width: "100%", height: "100%", minHeight: 96, objectFit: "cover", opacity: block.pending ? 0.4 : 0.92 }}
+              />
+            ) : (
+              <div style={{ minHeight: 96 }} />
+            )}
+            {block.pending && (
+              <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(90deg, transparent, rgba(229,21,42,0.4), transparent)",
+                    animation: "peSweep 1.15s linear infinite",
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
       <div
         style={{
           display: "flex",
@@ -1816,9 +2027,13 @@ function ResultCard({
       >
         <span style={{ fontSize: 11, color: T.red, letterSpacing: "0.08em" }}>
           &gt;_ {String(index).padStart(2, "0")}
-          <span style={{ color: T.muted, marginLeft: 10 }}>{words} słów</span>
+          <span style={{ color: T.muted, marginLeft: 10 }}>
+            {block.pending ? "pracuje" : block.error ? "blokada" : `${words} słów`}
+          </span>
         </span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {!block.pending && !block.error && (
+            <>
           <select
             defaultValue=""
             style={{ fontFamily: MONO, fontSize: 10, background: T.bg, color: T.text, border: `1px solid ${T.line2}`, padding: "3px 6px", colorScheme: "dark" }}
@@ -1849,8 +2064,18 @@ function ResultCard({
               KOPIUJ NEGATIVE
             </button>
           )}
+            </>
+          )}
         </div>
       </div>
+      {block.pending ? (
+        <div style={{ padding: 12, fontSize: 11, color: T.muted, animation: "pePulse 1.1s ease-in-out infinite" }}>
+          Generuję ten slot…
+        </div>
+      ) : block.error ? (
+        <div style={{ padding: 12, fontSize: 11, color: T.red, lineHeight: 1.6 }}>{block.error}</div>
+      ) : (
+        <>
       <pre style={{ padding: 12, whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.75, margin: 0 }}>{block.prompt}</pre>
       {block.negative && formatMode === "together" && (
         <div style={{ padding: "0 12px 12px" }}>
@@ -1858,6 +2083,9 @@ function ResultCard({
           <pre style={{ whiteSpace: "pre-wrap", fontSize: 11.5, margin: 0, color: T.muted }}>{block.negative}</pre>
         </div>
       )}
+        </>
+      )}
+      {!block.pending && !block.error && (
       <div style={{ padding: "6px 12px", borderTop: `1px solid ${T.line}`, background: T.panel2 }}>
         {!openRate ? (
           <button
@@ -1898,6 +2126,9 @@ function ResultCard({
             </button>
           </div>
         )}
+      </div>
+      )}
+        </div>
       </div>
     </div>
   );

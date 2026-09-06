@@ -13,7 +13,7 @@ export async function getSupabaseBrowser(): Promise<SupabaseClient> {
       const cfg = await res.json();
       if (!cfg.configured || !cfg.url || !cfg.anonKey) {
         throw new Error(
-          "Brak konfiguracji logowania. Na Vercel dodaj NEXT_PUBLIC_SUPABASE_ANON_KEY (anon public z Supabase) i zrób Redeploy."
+          "Logowanie niedostępne. Odśwież stronę. Jeśli wraca — daj znać adminowi."
         );
       }
       client = createClient(cfg.url, cfg.anonKey, {
