@@ -28,6 +28,7 @@ import { checkRateLimit, validateImages, type GuardResult } from "@/lib/rate-lim
 import { ALLOWED_MODEL_SET } from "@/lib/models";
 import { calculateCreditCost, expectedBlockCount } from "@/lib/credits";
 import { chatCompletions, userFacingLlmError } from "@/lib/llm";
+import { isModelRefusal } from "@/lib/refusal";
 
 // Nigdy nie prerenderować statycznie — endpoint zależy od nagłówka
 // Authorization i env vars w runtime, nie w czasie builda.
@@ -71,17 +72,6 @@ NEGATIVE: [treść po angielsku lub "-" jeśli instrukcja systemu nie przewiduje
 Jeden obraz/wariant = jeden blok.`;
 
 // ---------- parsowanie bloków ----------
-function isModelRefusal(raw: string): boolean {
-  const t = raw.toLowerCase();
-  return (
-    t.includes("can't assist") ||
-    t.includes("cannot assist") ||
-    t.includes("i’m sorry, i can’t") ||
-    t.includes("i'm sorry, i can't") ||
-    t.includes("i cannot help with that")
-  );
-}
-
 function parseBlocks(raw: string): PromptBlock[] {
   const out: PromptBlock[] = [];
   const re = /<<<BLOCK>>>([\s\S]*?)<<<END>>>/g;
@@ -297,7 +287,7 @@ export async function POST(req: NextRequest) {
   }
 
   const blocks = parseBlocks(raw);
-  if (isModelRefusal(raw) || (blocks.length === 1 && isModelRefusal(blocks[0].prompt))) {
+  if (isModelRefusal(raw) || blocks.some((b) => isModelRefusal(b.prompt))) {
     await supabaseAdmin.rpc("refund_credits", { p_user: userId, p_amount: cost });
     await supabaseAdmin.from("credit_transactions").insert({
       user_id: userId,

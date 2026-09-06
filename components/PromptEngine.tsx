@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { ALLOWED_MODELS } from "@/lib/models";
 import { calculateCreditCost } from "@/lib/credits";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { isModelRefusal } from "@/lib/refusal";
 
 type Tab = "konsola" | "konto" | "biblioteka" | "nauczyciel" | "admin";
 type AdminView = "payouts" | "users" | "cost" | "systems" | "ratings";
@@ -599,15 +600,18 @@ export default function PromptEngine() {
               }),
             });
             const b = json.blocks?.[0];
+            const refused = isModelRefusal(b?.prompt || "");
             setBlocks((prev) => {
               const next = [...prev];
-              next[i] = {
-                id: b?.id,
-                prompt: b?.prompt || "",
-                negative: b?.negative || "",
-                preview: slots[i].preview,
-                pending: false,
-              };
+              next[i] = refused
+                ? { prompt: "", negative: "", preview: slots[i].preview, pending: false, error: b?.prompt || "Blokada modelu." }
+                : {
+                    id: b?.id,
+                    prompt: b?.prompt || "",
+                    negative: b?.negative || "",
+                    preview: slots[i].preview,
+                    pending: false,
+                  };
               return next;
             });
             if (typeof json.creditsRemaining === "number") setCredits(json.creditsRemaining);
@@ -638,10 +642,13 @@ export default function PromptEngine() {
           }),
         });
         setBlocks(
-          (json.blocks || []).map((b: { id?: string; prompt: string; negative: string }, i: number) => ({
-            ...b,
-            preview: sourcePreviews[i] || sourcePreviews[0] || null,
-          }))
+          (json.blocks || []).map((b: { id?: string; prompt: string; negative: string }, i: number) => {
+            const preview = sourcePreviews[i] || sourcePreviews[0] || null;
+            if (isModelRefusal(b.prompt || "")) {
+              return { prompt: "", negative: "", preview, pending: false, error: b.prompt };
+            }
+            return { ...b, preview };
+          })
         );
         if (typeof json.creditsRemaining === "number") setCredits(json.creditsRemaining);
       }
@@ -1258,9 +1265,11 @@ export default function PromptEngine() {
               ))}
               {!blocks.length && !busy && (
                 <div className="peEmpty">
+                  <div className="peEmptyKicker">01 — canvas</div>
+                  <div className="peEmptyTitle">Ready when you are</div>
                   Wrzuć inspiracje albo wklej prompt.
                   <br />
-                  URUCHOM zapełni canvas — jeden obraz = jeden job.
+                  URUCHOM wypełni joby — jeden obraz, jeden slot.
                 </div>
               )}
             </div>
@@ -1922,8 +1931,11 @@ function ResultCard({
     }
   }
 
+  const blocked = Boolean(block.error) || isModelRefusal(block.prompt || "");
+  const blockMsg = block.error || block.prompt;
+
   return (
-    <div className={`peJob${block.pending ? " isPending" : ""}`}>
+    <div className={`peJob${block.pending ? " isPending" : ""}${blocked && !block.pending ? " isError" : ""}`}>
       {folderModal && (
         <StudioModal title="NOWY FOLDER" onClose={() => !folderBusy && setFolderModal(false)}>
           <input
@@ -1961,7 +1973,7 @@ function ResultCard({
         </StudioModal>
       )}
       <div style={{ display: "flex", alignItems: "stretch" }}>
-        {(block.preview || block.pending || block.error) && (
+        {(block.preview || block.pending || blocked) && (
           <div
             style={{
               width: 72,
@@ -2008,11 +2020,11 @@ function ResultCard({
         <span style={{ fontSize: 11, color: T.red, letterSpacing: "0.08em" }}>
           &gt;_ {String(index).padStart(2, "0")}
           <span style={{ color: T.muted, marginLeft: 10 }}>
-            {block.pending ? "pracuje" : block.error ? "blokada" : `${words} słów`}
+            {block.pending ? "pracuje" : blocked ? "blokada" : `${words} słów`}
           </span>
         </span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {!block.pending && !block.error && (
+          {!block.pending && !blocked && (
             <>
           <select
             defaultValue=""
@@ -2052,8 +2064,8 @@ function ResultCard({
         <div style={{ padding: 12, fontSize: 11, color: T.muted, animation: "pePulse 1.1s ease-in-out infinite" }}>
           Generuję ten slot…
         </div>
-      ) : block.error ? (
-        <div style={{ padding: 12, fontSize: 11, color: T.red, lineHeight: 1.6 }}>{block.error}</div>
+      ) : blocked ? (
+        <div style={{ padding: 14, fontSize: 13, color: T.red, lineHeight: 1.65 }}>{blockMsg}</div>
       ) : (
         <>
       <pre className="peMono" style={{ padding: 12, whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.75, margin: 0 }}>{block.prompt}</pre>
@@ -2065,7 +2077,7 @@ function ResultCard({
       )}
         </>
       )}
-      {!block.pending && !block.error && (
+      {!block.pending && !blocked && (
       <div style={{ padding: "6px 12px", borderTop: `1px solid ${T.line}`, background: T.panel2 }}>
         {!openRate ? (
           <button

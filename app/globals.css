@@ -12,7 +12,7 @@
   --pe-radius: 16px;
   --pe-radius-sm: 10px;
   --pe-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --pe-display: Iowan Old Style, Palatino Linotype, Palatino, Georgia, serif;
+  --pe-display: var(--font-display), Iowan Old Style, Palatino Linotype, Palatino, Georgia, serif;
 }
 
 html, body {
@@ -43,8 +43,30 @@ input, textarea, select, button { font-family: inherit; }
   0%, 100% { box-shadow: 0 0 22px rgba(229, 21, 42, 0.35); }
   50% { box-shadow: 0 0 36px rgba(229, 21, 42, 0.62); }
 }
+@keyframes peRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes peGridDrift {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 40px 40px, 40px 40px; }
+}
 
-.peApp { min-height: 100vh; color: var(--pe-fg); }
+body::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
+}
+
+.peApp {
+  min-height: 100vh;
+  color: var(--pe-fg);
+  animation: peRise 0.7s ease both;
+}
 
 .peTop {
   position: sticky;
@@ -62,10 +84,12 @@ input, textarea, select, button { font-family: inherit; }
 }
 .peTopBrand {
   justify-self: start;
-  letter-spacing: 0.18em;
+  font-family: var(--pe-display);
+  letter-spacing: 0.04em;
   color: var(--pe-red);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 400;
 }
 .peTopNav { justify-self: center; display: flex; flex-wrap: wrap; gap: 4px; }
 .peTopUser {
@@ -149,7 +173,9 @@ input, textarea, select, button { font-family: inherit; }
   border-radius: var(--pe-radius);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(14px);
+  transition: border-color 180ms ease, transform 180ms ease;
 }
+.peCard:hover { border-color: rgba(255, 255, 255, 0.14); }
 
 .peToolbar {
   display: flex;
@@ -188,17 +214,18 @@ input, textarea, select, button { font-family: inherit; }
     linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
   background-size: 40px 40px;
   background-color: rgba(8, 8, 8, 0.45);
+  animation: peGridDrift 28s linear infinite;
 }
 .peJobsHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--pe-line);
   background: rgba(14, 14, 14, 0.82);
   flex-shrink: 0;
 }
-.peJobGrid { display: flex; flex-direction: column; gap: 12px; padding: 14px; flex: 1; }
+.peJobGrid { display: flex; flex-direction: column; gap: 14px; padding: 18px; flex: 1; }
 .peJob {
   height: 100%;
   overflow: hidden;
@@ -206,18 +233,43 @@ input, textarea, select, button { font-family: inherit; }
   border: 1px solid var(--pe-line);
   border-radius: var(--pe-radius);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  animation: peRise 0.55s ease both;
+  transition: transform 180ms ease, border-color 180ms ease;
 }
+.peJob:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.16); }
 .peJob.isPending { box-shadow: 0 0 28px rgba(229, 21, 42, 0.22); border-color: rgba(229, 21, 42, 0.35); }
+.peJob.isError { border-color: rgba(229, 21, 42, 0.45); }
+.peJobGrid > .peJob:nth-child(1) { animation-delay: 0.02s; }
+.peJobGrid > .peJob:nth-child(2) { animation-delay: 0.08s; }
+.peJobGrid > .peJob:nth-child(3) { animation-delay: 0.14s; }
+.peJobGrid > .peJob:nth-child(4) { animation-delay: 0.2s; }
+.peJobGrid > .peJob:nth-child(n + 5) { animation-delay: 0.26s; }
 .peEmpty {
-  min-height: 320px;
+  min-height: 360px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   color: var(--pe-muted);
   font-size: 14px;
   line-height: 1.8;
   text-align: center;
-  padding: 40px;
+  padding: 48px 32px;
+}
+.peEmptyKicker {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--pe-red);
+  margin-bottom: 12px;
+}
+.peEmptyTitle {
+  font-family: var(--pe-display);
+  font-style: italic;
+  font-size: 36px;
+  color: var(--pe-fg);
+  letter-spacing: -0.03em;
+  margin-bottom: 14px;
+  line-height: 1.1;
 }
 .peDrop {
   display: flex;
@@ -366,13 +418,13 @@ input, textarea, select, button { font-family: inherit; }
   background: var(--pe-bg);
 }
 .peLoginBrand {
-  padding: 72px 48px;
+  padding: 80px 52px;
   border-right: 1px solid var(--pe-line);
   background:
     radial-gradient(600px 320px at 20% 10%, rgba(229, 21, 42, 0.22), transparent 60%),
     rgba(14, 14, 14, 0.9);
 }
-.peLoginForm { padding: 72px 48px; max-width: 460px; }
+.peLoginForm { padding: 80px 52px; max-width: 480px; }
 .peLogin input[type="text"],
 .peLogin input[type="email"],
 .peLogin input[type="password"] {

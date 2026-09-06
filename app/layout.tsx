@@ -1,7 +1,14 @@
-import { Inter } from "next/font/google";
+import { Instrument_Serif, Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin", "latin-ext"], display: "swap" });
+const display = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-display",
+});
 
 export const metadata = {
   title: "DAN STUDIO — PROMPT_ENGINE",
@@ -11,7 +18,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pl">
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} ${display.variable}`}>{children}</body>
     </html>
   );
 }
